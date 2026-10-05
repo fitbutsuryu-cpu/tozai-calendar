@@ -48,9 +48,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .brand .mark{display:inline-flex;border-radius:4px;overflow:hidden;font-family:var(--f-body);font-size:11px;font-weight:700}
 .brand .mark span{padding:2px 5px;color:#fff}
 .brand .mark .w{background:var(--west)} .brand .mark .e{background:var(--east)}
-.peers{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
-.peer{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 9px 2px 3px}
-.peer i{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10px;color:#fff;font-weight:700}
+.spacer{margin-left:auto}
 .status{font-size:12px;color:var(--muted)}
 .status.warn{color:var(--sun)}
 
@@ -98,7 +96,6 @@ button,input,textarea,select{font:inherit;color:inherit}
 .item .body{min-width:0}
 .item .t{font-weight:500;overflow-wrap:anywhere}
 .item .m{font-size:12px;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.item .lock{font-size:11px;color:var(--focus);font-weight:700}
 .item .mv{display:flex;flex-direction:column;gap:1px}
 .item .mv button{border:0;background:transparent;color:var(--muted);font-size:10px;line-height:1;padding:2px 4px;cursor:pointer;border-radius:4px}
 .item .mv button:hover{background:var(--surface)}
@@ -185,7 +182,7 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
   <header class="top">
     <h1 class="brand"><span class="mark"><span class="w">西</span><span class="e">東</span></span>東西共有カレンダー</h1>
     <span class="status" id="status">接続中…</span>
-    <div class="peers" id="peers" aria-label="いま見ている人"></div>
+    <span class="spacer"></span>
     <button class="btn" id="nameBtn" hidden title="表示名を変更"></button>
     <button class="btn" id="logoutBtn" hidden>ログアウト</button>
   </header>
@@ -273,7 +270,6 @@ const WD = ["月","火","水","木","金","土","日"];
 const HOL = {
 "2026-01-01":"元日","2026-01-12":"成人の日","2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日","2026-03-20":"春分の日","2026-04-29":"昭和の日","2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日","2026-05-06":"振替休日","2026-07-20":"海の日","2026-08-11":"山の日","2026-09-21":"敬老の日","2026-09-22":"国民の休日","2026-09-23":"秋分の日","2026-10-12":"スポーツの日","2026-11-03":"文化の日","2026-11-23":"勤労感謝の日",
 "2027-01-01":"元日","2027-01-11":"成人の日","2027-02-11":"建国記念の日","2027-02-23":"天皇誕生日","2027-03-21":"春分の日","2027-03-22":"振替休日","2027-04-29":"昭和の日","2027-05-03":"憲法記念日","2027-05-04":"みどりの日","2027-05-05":"こどもの日","2027-07-19":"海の日","2027-08-11":"山の日","2027-09-20":"敬老の日","2027-09-23":"秋分の日","2027-10-11":"スポーツの日","2027-11-03":"文化の日","2027-11-23":"勤労感謝の日"};
-const COLORS = ["#2e7a68","#34508f","#a05a2c","#7b4fa0","#8a6d1f","#b8433a","#2f7f9a","#5d6b2f"];
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs={}, ...kids) => { const e=document.createElement(tag);
@@ -285,13 +281,12 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
 const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
 const monday = d => addDays(d, -((d.getDay()+6)%7));
 const todayStr = () => ymd(new Date());
-const colorFor = id => { let n=0; for (const c of String(id)) n=(n*31+c.charCodeAt(0))>>>0; return COLORS[n%COLORS.length]; };
 
 // ---------- state ----------
 const S = {
   view:"week", anchor:new Date(), events:new Map(),
   me:null, myName:"", canWrite:true, demo:!firebaseConfig.apiKey,
-  peers:[], editingId:null, dragId:null, pendingRender:false, unsub:null, rangeKey:"", flashDate:null
+  dragId:null, pendingRender:false, unsub:null, rangeKey:"", flashDate:null
 };
 try { const v=localStorage.getItem("tozai.view"); if (v==="month"||v==="week") S.view=v; } catch {}
 
@@ -389,19 +384,16 @@ function renderWeek(){
   }
   return wrap;
 }
-const editorsOf = id => S.peers.filter(p=>p.uid!==S.me && p.editing===id);
 
 function renderLane(ds, region){
   const items=listFor(ds,region);
   const lane=h("div",{class:"lane"+(items.length?"":" empty"),"data-date":ds,"data-region":region});
   items.forEach((e,idx)=>{
-    const eds=editorsOf(e.id);
     const it=h("div",{class:"item",role:"button",tabindex:"0","data-id":e.id,draggable:S.canWrite?"true":null,
       onclick:ev=>{ if (ev.target.closest(".mv")) return; openDialog(e.id); },
       onkeydown:ev=>{ if (ev.key==="Enter"&&ev.target===it) openDialog(e.id); }},
       h("span",{class:"no",text:String(idx+1)}),
-      h("div",{class:"body"}, h("div",{class:"t",text:e.title||"(無題)"}), e.memo?h("div",{class:"m",text:e.memo}):null,
-        eds.length?h("div",{class:"lock",text:`✎ ${eds.map(p=>p.name||"だれか").join("、")} が編集中`}):null),
+      h("div",{class:"body"}, h("div",{class:"t",text:e.title||"(無題)"}), e.memo?h("div",{class:"m",text:e.memo}):null),
       S.canWrite?h("div",{class:"mv"},
         h("button",{type:"button","aria-label":"上へ",disabled:idx===0,onclick:()=>move(e.id,ds,region,idx-1),text:"▲"}),
         h("button",{type:"button","aria-label":"下へ",disabled:idx===items.length-1,onclick:()=>move(e.id,ds,region,idx+1),text:"▼"})):h("span"));
@@ -472,10 +464,9 @@ function openDialog(id, date, region){
   for (const el of dlg.querySelectorAll("input,textarea,select")) el.disabled=!S.canWrite;
   $("saveBtn").hidden=!S.canWrite;
   dlg.showModal(); if (S.canWrite) $("fTitle").focus();
-  S.editingId=id||null; heartbeat();
 }
 function closeDialog(){ if (dlg.open) dlg.close(); }
-dlg.addEventListener("close",()=>{ cur=null; S.editingId=null; heartbeat(); });
+dlg.addEventListener("close",()=>{ cur=null; });
 $("cancelBtn").onclick=closeDialog;
 for (const el of [$("fDate"),$("fWest"),$("fEast")]) el.addEventListener("change",()=>{
   if (!$("fDate").value||!cur) return;
@@ -532,49 +523,13 @@ $("nextBtn").onclick=()=>{ S.anchor = S.view==="week" ? addDays(S.anchor,7) : ne
 $("vWeek").onclick=()=>{ S.view="week"; saveView(); go(); };
 $("vMonth").onclick=()=>{ S.view="month"; saveView(); go(); };
 
-// ---------- status / presence ----------
+// ---------- status ----------
 function setStatus(msg, warn){
   const el=$("status");
   if (msg){ el.textContent=msg; el.classList.toggle("warn",!!warn); return; }
   el.classList.remove("warn");
   el.textContent = S.demo ? "デモモード" : S.canWrite ? "同時編集オン・変更は自動で共有" : "閲覧のみ";
 }
-// いま開いている人: 画面を表示している間だけ presence/{uid} に3分ごとに生存通知し、
-// 7分以内に通知のあった人を表示。無料枠（1日の読み書き回数）を使い切らないよう間隔を長めにしている。
-const HB_MS=3*60*1000, ALIVE_MS=7*60*1000;
-let hbTimer=null, rawPeers=[];
-async function heartbeat(){
-  if (S.demo||!F||!S.me||document.visibilityState!=="visible") return;
-  try{ await F.setDoc(F.doc(F.db,"presence",S.me),{name:S.myName,editing:S.editingId||null,lastSeen:Date.now()}); }catch{}
-}
-function leavePresence(){ if (!S.demo&&F&&S.me){ try{ F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} } }
-function refreshPeers(){
-  const now=Date.now();
-  const next=rawPeers.filter(p=>now-(p.lastSeen||0)<ALIVE_MS);
-  const changed = next.length!==S.peers.length || next.some((p,i)=>p!==S.peers[i]);
-  S.peers=next; return changed;
-}
-function watchPresence(){
-  F.onSnapshot(F.collection(F.db,"presence"), snap=>{
-    rawPeers=[]; snap.forEach(d=>rawPeers.push({uid:d.id,...d.data()}));
-    refreshPeers(); renderPeers(); if (!S.dragId) render();
-  }, ()=>{});
-  heartbeat(); hbTimer=setInterval(heartbeat,HB_MS);
-  setInterval(()=>{ if (refreshPeers()){ renderPeers(); if (!S.dragId) render(); } },60*1000);
-  document.addEventListener("visibilitychange",()=>{
-    if (document.visibilityState==="visible") heartbeat(); else if (!S.editingId) leavePresence();
-  });
-  addEventListener("pagehide",leavePresence);
-}
-function renderPeers(){
-  const box=$("peers"); box.replaceChildren();
-  for (const p of S.peers){
-    if (p.uid===S.me) continue; // 自分は右上の名前ボタンに表示
-    const nm = p.name||"だれか";
-    box.append(h("span",{class:"peer",title:p.name||""}, h("i",{style:`background:${colorFor(p.uid)}`,text:(p.name||"?").slice(0,1)}), nm));
-  }
-}
-
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); setTimeout(()=>t.remove(),1800); }
 function failed(err){
   console.error(err);
@@ -625,11 +580,11 @@ if (S.demo){
     $("nameForm").addEventListener("submit", async ev=>{
       ev.preventDefault(); const nm=$("nName").value.trim(); if (!nm) return;
       try{ await auth.updateProfile(a.currentUser,{displayName:nm}); }catch(e){ gateMsg("nameErr","保存できませんでした。もう一度お試しください。"); return; }
-      S.myName=nm; $("nameBtn").textContent=nm; $("gate").hidden=true; start(); heartbeat();
+      S.myName=nm; $("nameBtn").textContent=nm; $("gate").hidden=true; start();
     });
-    $("logoutBtn").onclick=async ()=>{ try{ await F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} await auth.signOut(a); location.reload(); };
+    $("logoutBtn").onclick=async ()=>{ await auth.signOut(a); location.reload(); };
     let started=false;
-    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); watchPresence(); render(); };
+    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); render(); };
     auth.onAuthStateChanged(a, u=>{
       if (!u){ $("gate").hidden=false; $("loginForm").hidden=false; $("nameForm").hidden=true; $("logoutBtn").hidden=true; $("nameBtn").hidden=true; return; }
       S.me=u.uid; S.myName=u.displayName||"";
