@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>東西共有カレンダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho+B1:wght@600;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 1行=1日、左に西日本・右に東日本のレーン。月表示は各マスを左右2分割。 */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --surface-2:#eceeeb; --fg:#1d2321; --muted:#68716d; --line:#d9ddd9;
+  --west:#2e7a68; --west-soft:#e2f0ec; --east:#34508f; --east-soft:#e4e9f5;
+  --sun:#b8433a; --sat:#3f63a8; --today:#fff6d9; --focus:#c08a1e;
+  --f-display:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141817; --surface:#1c2120; --surface-2:#232927; --fg:#e7ebe9; --muted:#97a19d; --line:#323936;
+  --west:#6cc3ad; --west-soft:#1f322d; --east:#8ea8e6; --east-soft:#222a3d;
+  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141817; --surface:#1c2120; --surface-2:#232927; --fg:#e7ebe9; --muted:#97a19d; --line:#323936;
+  --west:#6cc3ad; --west-soft:#1f322d; --east:#8ea8e6; --east-soft:#222a3d;
+  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+:root{color-scheme:light;padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}
+body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;padding:16px;padding-block:16px 48px}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.04em;margin:0;display:flex;align-items:center;gap:8px}
+.brand .mark{display:inline-flex;border-radius:4px;overflow:hidden;font-family:var(--f-body);font-size:11px;font-weight:700}
+.brand .mark span{padding:2px 5px;color:#fff}
+.brand .mark .w{background:var(--west)} .brand .mark .e{background:var(--east)}
+.peers{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
+.peer{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 9px 2px 3px}
+.peer i{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10px;color:#fff;font-weight:700}
+.status{font-size:12px;color:var(--muted)}
+.status.warn{color:var(--sun)}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:6px 12px;cursor:pointer;line-height:1.3}
+.btn:hover{background:var(--surface-2)}
+.btn.icon{padding:6px 10px;font-family:var(--f-num)}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.danger{color:var(--sun)}
+.btn.danger.armed{background:var(--sun);color:#fff;border-color:var(--sun)}
+.period{font-family:var(--f-display);font-weight:600;font-size:22px;margin:0 6px;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-left:auto}
+.seg button{border:0;background:var(--surface);padding:6px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+
+/* week view */
+.week{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.wrow{display:grid;grid-template-columns:92px 1fr 1fr;border-top:1px solid var(--line)}
+.wrow.head{border-top:0;position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--surface)}
+.wrow.head div{padding:8px 12px;font-weight:700;font-size:13px;letter-spacing:.08em}
+.wrow.head .hw{color:var(--west);border-left:1px solid var(--line);border-bottom:3px solid var(--west)}
+.wrow.head .he{color:var(--east);border-left:1px solid var(--line);border-bottom:3px solid var(--east)}
+.dlabel{padding:10px 12px;display:flex;flex-direction:column;gap:1px}
+.dlabel .d{font-family:var(--f-num);font-size:18px;font-variant-numeric:tabular-nums;line-height:1.1}
+.dlabel .w{font-size:12px;color:var(--muted)}
+.dlabel .hol{font-size:11px;color:var(--sun)}
+.wrow.sun .d,.wrow.hol .d,.wrow.sun .w,.wrow.hol .w{color:var(--sun)}
+.wrow.sat .d,.wrow.sat .w{color:var(--sat)}
+.wrow.today{background:var(--today)}
+.wrow.flash{animation:flash 1.4s ease-out}
+@keyframes flash{from{background:var(--today)}}
+.lane{border-left:1px solid var(--line);padding:6px 8px 8px;display:flex;flex-direction:column;gap:5px;min-width:0;min-height:52px;position:relative}
+.lane.drop{background:var(--surface-2)}
+.lane .add{align-self:flex-start;border:1px dashed var(--line);background:transparent;border-radius:6px;color:var(--muted);font-size:12px;padding:1px 8px;cursor:pointer;opacity:.0;transition:opacity .15s}
+.wrow:hover .add,.lane .add:focus-visible,.lane.empty .add{opacity:1}
+@media (hover:none){.lane .add{opacity:1}}
+.item{display:grid;grid-template-columns:22px 1fr auto;align-items:start;gap:6px;border-radius:6px;padding:5px 6px 5px 4px;cursor:pointer;border:1px solid transparent;min-width:0;text-align:left;width:100%}
+.lane[data-region="west"] .item{background:var(--west-soft)}
+.lane[data-region="east"] .item{background:var(--east-soft)}
+.item:hover{border-color:var(--line)}
+.item.dragging{opacity:.4}
+.item .no{font-family:var(--f-num);font-size:11px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;margin-top:1px}
+.lane[data-region="west"] .no{background:var(--west)}
+.lane[data-region="east"] .no{background:var(--east)}
+.item .body{min-width:0}
+.item .t{font-weight:500;overflow-wrap:anywhere}
+.item .m{font-size:12px;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.item .lock{font-size:11px;color:var(--focus);font-weight:700}
+.item .mv{display:flex;flex-direction:column;gap:1px}
+.item .mv button{border:0;background:transparent;color:var(--muted);font-size:10px;line-height:1;padding:2px 4px;cursor:pointer;border-radius:4px}
+.item .mv button:hover{background:var(--surface)}
+.item .mv button:disabled{visibility:hidden}
+.ins{height:2px;background:var(--focus);border-radius:2px;margin:-3px 0}
+
+/* month view */
+.month{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.mhead div{padding:6px 8px;font-size:12px;color:var(--muted);text-align:center;border-bottom:1px solid var(--line)}
+.mhead div:nth-child(6){color:var(--sat)} .mhead div:nth-child(7){color:var(--sun)}
+.cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:112px;padding:4px 4px 6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--surface);text-align:left;border-top:0;border-left:0}
+.cell:nth-child(7n){border-right:0}
+.cell:hover{background:var(--surface-2)}
+.cell.out{opacity:.45}
+.cell.today{background:var(--today)}
+.cell .cd{font-family:var(--f-num);font-size:12px;display:flex;gap:4px;align-items:baseline;min-width:0}
+.cell .cd small{font-family:var(--f-body);font-size:10px;color:var(--sun);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell.sun .cd,.cell.hol .cd{color:var(--sun)} .cell.sat .cd{color:var(--sat)}
+.halves{display:grid;grid-template-columns:1fr 1fr;gap:3px;flex:1;min-height:0}
+.half{border-radius:4px;padding:2px 3px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.half.west{background:var(--west-soft)} .half.east{background:var(--east-soft)}
+.half .li{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.half.west .li::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--west);margin-right:3px;vertical-align:middle}
+.half.east .li::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--east);margin-right:3px;vertical-align:middle}
+.half .more{font-size:10px;color:var(--muted)}
+.half .cnt{display:none;font-family:var(--f-num);font-size:11px;text-align:center}
+.half.west .cnt{color:var(--west)} .half.east .cnt{color:var(--east)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.empty-note{font-size:13px;color:var(--muted);padding:0 2px}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);padding:0;width:min(460px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(10,14,12,.45)}
+.dlg{display:grid;gap:14px;padding:18px}
+.dlg h2{font-family:var(--f-display);font-size:18px;margin:0}
+.field{display:grid;gap:5px}
+.field label,.field .lb{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.field input,.field textarea,.field select{border:1px solid var(--line);background:var(--bg);border-radius:var(--r);padding:8px 10px;width:100%}
+.field textarea{min-height:72px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.regions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.regions label{display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:var(--r);padding:8px;cursor:pointer;font-size:14px;color:var(--fg)}
+.regions input{width:auto;margin:0}
+.regions label:has(input[value="west"]:checked){background:var(--west-soft);border-color:var(--west);color:var(--west);font-weight:700}
+.regions label:has(input[value="east"]:checked){background:var(--east-soft);border-color:var(--east);color:var(--east);font-weight:700}
+.notice{font-size:13px;border-radius:var(--r);padding:8px 10px;background:var(--today);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.notice button{margin-left:auto}
+.meta{font-size:12px;color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.acts .sp{flex:1}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:20}
+
+.gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;padding:16px;z-index:30}
+.gate .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;max-width:380px;width:100%;display:grid;gap:14px;text-align:center}
+.gate h2{font-family:var(--f-display);margin:0;font-size:22px}
+.gate p{margin:0;color:var(--muted);font-size:13px}
+.gate .err{color:var(--sun)}
+.gate .field{text-align:left}
+.linkbtn{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:2px}
+@media (max-width:640px){
+  .wrow{grid-template-columns:1fr 1fr}
+  .wrow .dlabel{grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:8px;padding:8px 10px 2px}
+  .wrow.head .sp0{display:none}
+  .wrow.head .hw{border-left:0}
+  .lane:first-of-type{border-left:0}
+  .wrow .lane[data-region="west"]{border-left:0}
+  .period{font-size:18px}
+  .seg{margin-left:0}
+  .cell{min-height:64px}
+  .half .li,.half .more{display:none}
+  .half .cnt{display:block}
+  .cell .cd small{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand"><span class="mark"><span class="w">西</span><span class="e">東</span></span>東西共有カレンダー</h1>
+    <span class="status" id="status">接続中…</span>
+    <div class="peers" id="peers" aria-label="いま見ている人"></div>
+    <button class="btn" id="nameBtn" hidden title="表示名を変更"></button>
+    <button class="btn" id="logoutBtn" hidden>ログアウト</button>
+  </header>
+  <p class="notice" id="demoNote" hidden>デモモードです。予定はこのブラウザにだけ保存され、他の人とは共有されません。共有するには README の手順で Firebase の設定を入れてください。</p>
+
+  <nav class="bar">
+    <button class="btn" id="todayBtn">今日</button>
+    <button class="btn icon" id="prevBtn" aria-label="前へ">‹</button>
+    <button class="btn icon" id="nextBtn" aria-label="次へ">›</button>
+    <h2 class="period" id="period"></h2>
+    <div class="seg" role="group" aria-label="表示">
+      <button id="vWeek" aria-pressed="true">週</button>
+      <button id="vMonth" aria-pressed="false">月</button>
+    </div>
+  </nav>
+
+  <p class="empty-note" id="emptyNote" hidden>この期間の予定はまだありません。日付の「＋ 追加」から入れると、全員の画面にすぐ反映されます。</p>
+  <main id="view"></main>
+</div>
+
+<dialog id="dlg">
+  <form class="dlg" id="form" method="dialog">
+    <h2 id="dlgTitle">予定を追加</h2>
+    <div class="notice" id="conflict" hidden><span id="conflictText"></span><button type="button" class="btn" id="reloadBtn">最新を読み込む</button></div>
+    <div class="row2">
+      <div class="field"><label for="fDate">日付</label><input type="date" id="fDate" required></div>
+      <div class="field"><label for="fOrder">順番</label><select id="fOrder"></select></div>
+    </div>
+    <div class="field"><span class="lb">地域</span>
+      <div class="regions">
+        <label><input type="radio" name="region" id="fWest" value="west">西日本</label>
+        <label><input type="radio" name="region" id="fEast" value="east">東日本</label>
+      </div>
+    </div>
+    <div class="field"><label for="fTitle">内容</label><input id="fTitle" required maxlength="120" placeholder="例: 大阪支店 打ち合わせ"></div>
+    <div class="field"><label for="fMemo">メモ</label><textarea id="fMemo" maxlength="1000" placeholder="場所、担当、持ち物など"></textarea></div>
+    <p class="meta" id="fMeta" hidden></p>
+    <div class="acts">
+      <button type="button" class="btn danger" id="delBtn" hidden>削除</button>
+      <span class="sp"></span>
+      <button type="button" class="btn" id="cancelBtn">閉じる</button>
+      <button type="submit" class="btn primary" id="saveBtn">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="gate" id="gate" hidden>
+  <form class="card" id="loginForm">
+    <h2>東西共有カレンダー</h2>
+    <p>管理者から受け取ったメールアドレスとパスワードでログインしてください。</p>
+    <div class="field"><label for="lEmail">メールアドレス</label><input type="email" id="lEmail" autocomplete="username" required></div>
+    <div class="field"><label for="lPass">パスワード</label><input type="password" id="lPass" autocomplete="current-password" required></div>
+    <button type="submit" class="btn primary" id="loginBtn">ログイン</button>
+    <button type="button" class="linkbtn" id="resetBtn">パスワードを忘れた場合</button>
+    <p class="err" id="gateErr" hidden></p>
+    <p id="gateInfo" hidden></p>
+  </form>
+  <form class="card" id="nameForm" hidden>
+    <h2>表示名の設定</h2>
+    <p>ほかのメンバーの画面に表示される名前です。あとから右上の名前を押して変更できます。</p>
+    <div class="field"><label for="nName">表示名</label><input id="nName" maxlength="20" required placeholder="例: 田中（大阪）"></div>
+    <button type="submit" class="btn primary">はじめる</button>
+    <p class="err" id="nameErr" hidden></p>
+  </form>
+</div>
+
+<script type="module">
+// ============================================================
+//  設定: Firebase コンソールの「プロジェクトの設定 → マイアプリ」に
+//  表示される firebaseConfig をここに貼り付けてください。
+//  apiKey が空のままだとデモモード（このブラウザだけに保存）で動きます。
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyB8y7ebbsjgzBBhbxmwTqmnZmE64La4Ngc",
+  authDomain: "tozai-calendar.firebaseapp.com",
+  projectId: "tozai-calendar",
+  storageBucket: "tozai-calendar.firebasestorage.app",
+  messagingSenderId: "1082134125268",
+  appId: "1:1082134125268:web:8370840e36749bc7053941"
+};
+const FB = "https://www.gstatic.com/firebasejs/11.10.0/";
+
+const REGIONS = [{k:"west",n:"西日本"},{k:"east",n:"東日本"}];
+const WD = ["月","火","水","木","金","土","日"];
+const HOL = {
+"2026-01-01":"元日","2026-01-12":"成人の日","2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日","2026-03-20":"春分の日","2026-04-29":"昭和の日","2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日","2026-05-06":"振替休日","2026-07-20":"海の日","2026-08-11":"山の日","2026-09-21":"敬老の日","2026-09-22":"国民の休日","2026-09-23":"秋分の日","2026-10-12":"スポーツの日","2026-11-03":"文化の日","2026-11-23":"勤労感謝の日",
+"2027-01-01":"元日","2027-01-11":"成人の日","2027-02-11":"建国記念の日","2027-02-23":"天皇誕生日","2027-03-21":"春分の日","2027-03-22":"振替休日","2027-04-29":"昭和の日","2027-05-03":"憲法記念日","2027-05-04":"みどりの日","2027-05-05":"こどもの日","2027-07-19":"海の日","2027-08-11":"山の日","2027-09-20":"敬老の日","2027-09-23":"秋分の日","2027-10-11":"スポーツの日","2027-11-03":"文化の日","2027-11-23":"勤労感謝の日"};
+const COLORS = ["#2e7a68","#34508f","#a05a2c","#7b4fa0","#8a6d1f","#b8433a","#2f7f9a","#5d6b2f"];
+
+const $ = id => document.getElementById(id);
+const h = (tag, attrs={}, ...kids) => { const e=document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) { if (v==null||v===false) continue;
+    if (k==="class") e.className=v; else if (k==="text") e.textContent=v; else if (k.startsWith("on")) e.addEventListener(k.slice(2),v); else e.setAttribute(k,v===true?"":v); }
+  for (const c of kids.flat()) if (c!=null) e.append(c.nodeType?c:document.createTextNode(c)); return e; };
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const monday = d => addDays(d, -((d.getDay()+6)%7));
+const todayStr = () => ymd(new Date());
+const colorFor = id => { let n=0; for (const c of String(id)) n=(n*31+c.charCodeAt(0))>>>0; return COLORS[n%COLORS.length]; };
+
+// ---------- state ----------
+const S = {
+  view:"week", anchor:new Date(), events:new Map(),
+  me:null, myName:"", canWrite:true, demo:!firebaseConfig.apiKey,
+  peers:[], editingId:null, dragId:null, pendingRender:false, unsub:null, rangeKey:"", flashDate:null
+};
+try { const v=localStorage.getItem("tozai.view"); if (v==="month"||v==="week") S.view=v; } catch {}
+
+let F = null; // Firebase の関数とインスタンス
+
+// ---------- store（Firestore / デモ用ローカル保存） ----------
+function demoSave(){ try{ localStorage.setItem("tozai.demo", JSON.stringify([...S.events])); }catch{} }
+function demoLoad(){ try{ S.events=new Map(JSON.parse(localStorage.getItem("tozai.demo")||"[]")); }catch{ S.events=new Map(); } }
+const store = {
+  async add(data){
+    if (S.demo){ S.events.set("l"+Math.random().toString(36).slice(2), data); demoSave(); render(); return; }
+    await F.addDoc(F.collection(F.db,"events"), data);
+  },
+  async update(id,data){
+    if (S.demo){ S.events.set(id,{...S.events.get(id),...data}); demoSave(); render(); return; }
+    await F.updateDoc(F.doc(F.db,"events",id), data);
+  },
+  async remove(id){
+    if (S.demo){ S.events.delete(id); demoSave(); render(); return; }
+    await F.deleteDoc(F.doc(F.db,"events",id));
+  }
+};
+
+function range(){
+  if (S.view==="week"){ const s=monday(S.anchor); return [s, addDays(s,6)]; }
+  const s=monday(new Date(S.anchor.getFullYear(), S.anchor.getMonth(), 1)); return [s, addDays(s,41)];
+}
+function subscribe(){
+  if (S.demo || !F) return;
+  const [s,e]=range(); const key=ymd(s)+"_"+ymd(e);
+  if (key===S.rangeKey) return; S.rangeKey=key;
+  if (S.unsub) S.unsub();
+  const q=F.query(F.collection(F.db,"events"), F.where("date",">=",ymd(s)), F.where("date","<=",ymd(e)));
+  S.unsub=F.onSnapshot(q, snap=>{
+    const m=new Map(); snap.forEach(d=>m.set(d.id,d.data()));
+    S.events=m; setStatus(); checkConflict();
+    if (S.dragId) S.pendingRender=true; else render();
+  }, err=>{
+    S.rangeKey="";
+    if (err.code==="permission-denied") setStatus("このアカウントには閲覧権限がありません。管理者に追加を依頼してください。", true);
+    else setStatus("接続が切れました。ページを再読み込みしてください。", true);
+  });
+}
+
+// ---------- helpers ----------
+function listFor(date, region, exclude){
+  const out=[]; for (const [id,e] of S.events) if (e.date===date && e.region===region && id!==exclude) out.push({id,...e});
+  out.sort((a,b)=>(a.order-b.order)||((a.createdAt||0)-(b.createdAt||0))); return out;
+}
+function orderAt(list, idx){
+  if (!list.length) return 1024;
+  if (idx<=0) return list[0].order-1024;
+  if (idx>=list.length) return list[list.length-1].order+1024;
+  return (list[idx-1].order+list[idx].order)/2;
+}
+const stamp = () => ({updatedAt:Date.now(), updatedBy:S.me||null, updatedByName:S.myName||""});
+async function placeAt(id, date, region, idx){
+  const list=listFor(date,region,id);
+  const tight = idx>0 && idx<list.length && (list[idx].order-list[idx-1].order)<1e-6;
+  if (tight){ // 間隔が詰まったら番号を振り直す
+    const all=[...list]; all.splice(idx,0,{id});
+    for (let i=0;i<all.length;i++){ const patch={order:(i+1)*1024}; if (all[i].id===id) Object.assign(patch,{date,region,...stamp()}); await store.update(all[i].id,patch); }
+    return;
+  }
+  await store.update(id,{date,region,order:orderAt(list,idx),...stamp()});
+}
+
+// ---------- rendering ----------
+function render(){
+  S.pendingRender=false;
+  $("vWeek").setAttribute("aria-pressed", S.view==="week");
+  $("vMonth").setAttribute("aria-pressed", S.view==="month");
+  const view=$("view"); view.replaceChildren(S.view==="week"?renderWeek():renderMonth());
+  $("emptyNote").hidden = S.events.size>0 || !S.canWrite;
+  if (S.flashDate){ const r=view.querySelector(`[data-row="${S.flashDate}"]`); if (r){ r.classList.add("flash"); r.scrollIntoView({block:"nearest"}); } S.flashDate=null; }
+}
+function periodLabel(){
+  if (S.view==="month") return `${S.anchor.getFullYear()}年${S.anchor.getMonth()+1}月`;
+  const s=monday(S.anchor), e=addDays(s,6);
+  return s.getMonth()===e.getMonth() ? `${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日〜${e.getDate()}日` : `${s.getFullYear()}年${s.getMonth()+1}/${s.getDate()}〜${e.getMonth()+1}/${e.getDate()}`;
+}
+function dayClass(d){ const s=ymd(d), w=d.getDay(); return [w===0?"sun":"", w===6?"sat":"", HOL[s]?"hol":"", s===todayStr()?"today":""].filter(Boolean).join(" "); }
+
+function renderWeek(){
+  $("period").textContent=periodLabel();
+  const wrap=h("div",{class:"week"});
+  wrap.append(h("div",{class:"wrow head"}, h("div",{class:"sp0"}), h("div",{class:"hw",text:"西日本"}), h("div",{class:"he",text:"東日本"})));
+  const s=monday(S.anchor);
+  for (let i=0;i<7;i++){
+    const d=addDays(s,i), ds=ymd(d);
+    const row=h("div",{class:"wrow "+dayClass(d),"data-row":ds},
+      h("div",{class:"dlabel"}, h("span",{class:"d",text:`${d.getMonth()+1}/${d.getDate()}`}), h("span",{class:"w",text:WD[i]+"曜日"}), HOL[ds]?h("span",{class:"hol",text:HOL[ds]}):null));
+    for (const r of REGIONS) row.append(renderLane(ds,r.k));
+    wrap.append(row);
+  }
+  return wrap;
+}
+const editorsOf = id => S.peers.filter(p=>p.uid!==S.me && p.editing===id);
+
+function renderLane(ds, region){
+  const items=listFor(ds,region);
+  const lane=h("div",{class:"lane"+(items.length?"":" empty"),"data-date":ds,"data-region":region});
+  items.forEach((e,idx)=>{
+    const eds=editorsOf(e.id);
+    const it=h("div",{class:"item",role:"button",tabindex:"0","data-id":e.id,draggable:S.canWrite?"true":null,
+      onclick:ev=>{ if (ev.target.closest(".mv")) return; openDialog(e.id); },
+      onkeydown:ev=>{ if (ev.key==="Enter"&&ev.target===it) openDialog(e.id); }},
+      h("span",{class:"no",text:String(idx+1)}),
+      h("div",{class:"body"}, h("div",{class:"t",text:e.title||"(無題)"}), e.memo?h("div",{class:"m",text:e.memo}):null,
+        eds.length?h("div",{class:"lock",text:`✎ ${eds.map(p=>p.name||"だれか").join("、")} が編集中`}):null),
+      S.canWrite?h("div",{class:"mv"},
+        h("button",{type:"button","aria-label":"上へ",disabled:idx===0,onclick:()=>move(e.id,ds,region,idx-1),text:"▲"}),
+        h("button",{type:"button","aria-label":"下へ",disabled:idx===items.length-1,onclick:()=>move(e.id,ds,region,idx+1),text:"▼"})):h("span"));
+    if (S.canWrite){
+      it.addEventListener("dragstart",ev=>{ S.dragId=e.id; it.classList.add("dragging"); ev.dataTransfer.effectAllowed="move"; try{ev.dataTransfer.setData("text/plain",e.id);}catch{} });
+      it.addEventListener("dragend",()=>{ S.dragId=null; clearIns(); if (S.pendingRender) render(); else it.classList.remove("dragging"); });
+    }
+    lane.append(it);
+  });
+  if (S.canWrite){
+    lane.append(h("button",{type:"button",class:"add",onclick:()=>openDialog(null,ds,region),text:"＋ 追加"}));
+    lane.addEventListener("dragover",ev=>{ if(!S.dragId) return; ev.preventDefault(); showIns(lane, insIndex(lane,ev.clientY)); });
+    lane.addEventListener("dragleave",ev=>{ if(!lane.contains(ev.relatedTarget)) clearIns(); });
+    lane.addEventListener("drop",async ev=>{ if(!S.dragId) return; ev.preventDefault(); const id=S.dragId; const idx=insIndex(lane,ev.clientY); clearIns();
+      try{ await placeAt(id, ds, region, idx); }catch(err){ failed(err); } });
+  }
+  return lane;
+}
+function insIndex(lane,y){ let i=0; for (const it of lane.querySelectorAll(".item:not(.dragging)")){ const r=it.getBoundingClientRect(); if (y>r.top+r.height/2) i++; } return i; }
+function clearIns(){ document.querySelectorAll(".ins").forEach(x=>x.remove()); document.querySelectorAll(".lane.drop").forEach(x=>x.classList.remove("drop")); }
+function showIns(lane,idx){ clearIns(); lane.classList.add("drop"); const items=[...lane.querySelectorAll(".item:not(.dragging)")]; const mark=h("div",{class:"ins"}); lane.insertBefore(mark, idx<items.length?items[idx]:lane.querySelector(".add")); }
+async function move(id,ds,region,toIdx){ try{ await placeAt(id,ds,region,toIdx); }catch(err){ failed(err); } }
+
+function renderMonth(){
+  $("period").textContent=periodLabel();
+  const box=h("div",{class:"month"});
+  box.append(h("div",{class:"mgrid mhead"}, WD.map(w=>h("div",{text:w}))));
+  const grid=h("div",{class:"mgrid"}); const [s]=range(); const m=S.anchor.getMonth();
+  for (let i=0;i<42;i++){
+    const d=addDays(s,i), ds=ymd(d);
+    const cell=h("button",{type:"button",class:"cell "+dayClass(d)+(d.getMonth()!==m?" out":""),"aria-label":`${d.getMonth()+1}月${d.getDate()}日の週を開く`,
+      onclick:()=>{ S.anchor=d; S.view="week"; S.flashDate=ds; saveView(); go(); }},
+      h("span",{class:"cd"}, String(d.getDate()), HOL[ds]?h("small",{text:HOL[ds]}):null));
+    const halves=h("div",{class:"halves"});
+    for (const r of REGIONS){
+      const items=listFor(ds,r.k); const half=h("div",{class:"half "+r.k,title:r.n});
+      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li",text:`${j+1}. ${e.title||"(無題)"}`})));
+      if (items.length>3) half.append(h("div",{class:"more",text:`ほか${items.length-3}件`}));
+      if (items.length) half.append(h("div",{class:"cnt",text:String(items.length)}));
+      halves.append(half);
+    }
+    cell.append(halves); grid.append(cell);
+  }
+  box.append(grid, h("div",{class:"legend"}, h("span",{},h("b",{style:"background:var(--west)"}),"左＝西日本"), h("span",{},h("b",{style:"background:var(--east)"}),"右＝東日本"), h("span",{text:"日付を押すとその週を開きます"})));
+  return box;
+}
+
+// ---------- dialog ----------
+const dlg=$("dlg"); let cur=null;
+const regionVal = () => $("fEast").checked ? "east" : "west";
+function fillOrderSelect(date, region, id, selIdx){
+  const list=listFor(date,region,id); const sel=$("fOrder"); sel.replaceChildren();
+  for (let i=0;i<=list.length;i++) sel.append(h("option",{value:String(i),text: i===list.length?`${i+1}番目（最後）`:`${i+1}番目（${list[i].title||"無題"} の前）`}));
+  sel.value=String(Math.min(selIdx??list.length, list.length));
+}
+function openDialog(id, date, region){
+  const e = id ? S.events.get(id) : null; if (id && !e) return;
+  cur={id, base:e?{...e}:null};
+  $("dlgTitle").textContent = id ? (S.canWrite?"予定を編集":"予定") : "予定を追加";
+  $("fDate").value = e ? e.date : date;
+  ((e?e.region:region)==="east" ? $("fEast") : $("fWest")).checked=true;
+  $("fTitle").value = e?(e.title||""):""; $("fMemo").value = e?(e.memo||""):"";
+  fillOrderSelect($("fDate").value, regionVal(), id, id ? listFor(e.date,e.region).findIndex(x=>x.id===id) : null);
+  $("delBtn").hidden = !id || !S.canWrite; disarm();
+  $("conflict").hidden=true; $("saveBtn").disabled=false;
+  $("fMeta").hidden=!(e&&e.updatedAt);
+  if (e&&e.updatedAt){ const t=new Date(e.updatedAt); $("fMeta").textContent=`最終更新 ${t.getMonth()+1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}${e.updatedByName?"・"+e.updatedByName:""}`; }
+  for (const el of dlg.querySelectorAll("input,textarea,select")) el.disabled=!S.canWrite;
+  $("saveBtn").hidden=!S.canWrite;
+  dlg.showModal(); if (S.canWrite) $("fTitle").focus();
+  S.editingId=id||null; heartbeat();
+}
+function closeDialog(){ if (dlg.open) dlg.close(); }
+dlg.addEventListener("close",()=>{ cur=null; S.editingId=null; heartbeat(); });
+$("cancelBtn").onclick=closeDialog;
+for (const el of [$("fDate"),$("fWest"),$("fEast")]) el.addEventListener("change",()=>{
+  if (!$("fDate").value||!cur) return;
+  const same = cur.base && cur.base.date===$("fDate").value && cur.base.region===regionVal();
+  fillOrderSelect($("fDate").value, regionVal(), cur.id, same ? listFor(cur.base.date,cur.base.region).findIndex(x=>x.id===cur.id) : null);
+});
+function checkConflict(){
+  if (!cur || !cur.id || !dlg.open) return;
+  const now=S.events.get(cur.id);
+  if (!now){ $("conflictText").textContent="この予定はほかの人が削除しました。"; $("reloadBtn").hidden=true; $("saveBtn").disabled=true; $("conflict").hidden=false; return; }
+  if (now.updatedAt!==cur.base.updatedAt && now.updatedBy!==S.me){
+    $("conflictText").textContent=`${now.updatedByName||"ほかの人"}さんがこの予定を更新しました。保存すると、あなたが変えた項目だけを上書きします。`;
+    $("reloadBtn").hidden=false; $("conflict").hidden=false;
+  }
+}
+$("reloadBtn").onclick=()=>openDialog(cur.id);
+$("form").addEventListener("submit", async ev=>{
+  ev.preventDefault(); if (!S.canWrite) return;
+  const title=$("fTitle").value.trim(); if (!title){ $("fTitle").focus(); return; }
+  const date=$("fDate").value, region=regionVal(), idx=Number($("fOrder").value), memo=$("fMemo").value.trim();
+  $("saveBtn").disabled=true;
+  try{
+    if (!cur.id){
+      await store.add({date,region,title,memo,order:orderAt(listFor(date,region),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
+      toast("追加しました");
+    } else {
+      const b=cur.base, patch={};
+      if (title!==(b.title||"")) patch.title=title;
+      if (memo!==(b.memo||"")) patch.memo=memo;
+      const oldIdx=listFor(b.date,b.region).findIndex(x=>x.id===cur.id);
+      const moved = date!==b.date || region!==b.region || idx!==oldIdx;
+      if (Object.keys(patch).length) await store.update(cur.id,{...patch,...stamp()});
+      if (moved) await placeAt(cur.id,date,region,idx);
+      toast("保存しました");
+    }
+    closeDialog();
+  }catch(err){ failed(err); }
+  finally{ $("saveBtn").disabled=false; }
+});
+let armTimer=null;
+function disarm(){ $("delBtn").classList.remove("armed"); $("delBtn").textContent="削除"; clearTimeout(armTimer); }
+$("delBtn").onclick=async ()=>{
+  const b=$("delBtn");
+  if (!b.classList.contains("armed")){ b.classList.add("armed"); b.textContent="もう一度押すと削除"; armTimer=setTimeout(disarm,4000); return; }
+  try{ await store.remove(cur.id); toast("削除しました"); closeDialog(); }catch(err){ failed(err); }
+};
+
+// ---------- nav ----------
+function saveView(){ try{ localStorage.setItem("tozai.view",S.view); }catch{} }
+function go(){ subscribe(); render(); }
+$("todayBtn").onclick=()=>{ S.anchor=new Date(); S.flashDate=S.view==="week"?todayStr():null; go(); };
+$("prevBtn").onclick=()=>{ S.anchor = S.view==="week" ? addDays(S.anchor,-7) : new Date(S.anchor.getFullYear(),S.anchor.getMonth()-1,1); go(); };
+$("nextBtn").onclick=()=>{ S.anchor = S.view==="week" ? addDays(S.anchor,7) : new Date(S.anchor.getFullYear(),S.anchor.getMonth()+1,1); go(); };
+$("vWeek").onclick=()=>{ S.view="week"; saveView(); go(); };
+$("vMonth").onclick=()=>{ S.view="month"; saveView(); go(); };
+
+// ---------- status / presence ----------
+function setStatus(msg, warn){
+  const el=$("status");
+  if (msg){ el.textContent=msg; el.classList.toggle("warn",!!warn); return; }
+  el.classList.remove("warn");
+  el.textContent = S.demo ? "デモモード" : S.canWrite ? "同時編集オン・変更は自動で共有" : "閲覧のみ";
+}
+// いま開いている人: presence/{uid} に20秒ごとに生存通知、60秒以内の人を表示
+let hbTimer=null;
+async function heartbeat(){
+  if (S.demo||!F||!S.me) return;
+  try{ await F.setDoc(F.doc(F.db,"presence",S.me),{name:S.myName,editing:S.editingId||null,lastSeen:Date.now()}); }catch{}
+}
+function watchPresence(){
+  F.onSnapshot(F.collection(F.db,"presence"), snap=>{
+    const now=Date.now(), list=[];
+    snap.forEach(d=>{ const p=d.data(); if (now-(p.lastSeen||0)<60000) list.push({uid:d.id,...p}); });
+    S.peers=list; renderPeers(); if (!S.dragId) render();
+  }, ()=>{});
+  heartbeat(); hbTimer=setInterval(heartbeat,20000);
+  setInterval(()=>{ const n=Date.now(); const before=S.peers.length; S.peers=S.peers.filter(p=>n-(p.lastSeen||0)<60000); if (S.peers.length!==before) renderPeers(); },15000);
+  document.addEventListener("visibilitychange",()=>{ if (document.visibilityState==="visible") heartbeat(); });
+  addEventListener("pagehide",()=>{ try{ F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} });
+}
+function renderPeers(){
+  const box=$("peers"); box.replaceChildren();
+  for (const p of S.peers){
+    if (p.uid===S.me) continue; // 自分は右上の名前ボタンに表示
+    const nm = p.name||"だれか";
+    box.append(h("span",{class:"peer",title:p.name||""}, h("i",{style:`background:${colorFor(p.uid)}`,text:(p.name||"?").slice(0,1)}), nm));
+  }
+}
+
+function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); setTimeout(()=>t.remove(),1800); }
+function failed(err){
+  console.error(err);
+  if (err && err.code==="permission-denied"){ S.canWrite=false; setStatus(); render(); toast("このアカウントには編集権限がありません"); return; }
+  toast("保存できませんでした。通信を確認してもう一度お試しください");
+}
+
+// ---------- 起動 ----------
+render();
+if (S.demo){
+  demoLoad(); $("demoNote").hidden=false; setStatus(); render();
+} else {
+  setStatus("読み込み中…");
+  try{
+    const app=await import(FB+"firebase-app.js");
+    const auth=await import(FB+"firebase-auth.js");
+    const fs=await import(FB+"firebase-firestore.js");
+    const fbApp=app.initializeApp(firebaseConfig);
+    const a=auth.getAuth(fbApp);
+    F={...fs, db:fs.initializeFirestore(fbApp,{localCache:fs.persistentLocalCache()})};
+    const gateMsg=(id,msg)=>{ $(id).textContent=msg; $(id).hidden=!msg; };
+    const authErr=c=>({
+      "auth/invalid-credential":"メールアドレスかパスワードが違います。",
+      "auth/wrong-password":"メールアドレスかパスワードが違います。",
+      "auth/user-not-found":"メールアドレスかパスワードが違います。",
+      "auth/invalid-email":"メールアドレスの形式が正しくありません。",
+      "auth/user-disabled":"このアカウントは停止されています。管理者に確認してください。",
+      "auth/too-many-requests":"失敗が続いたため一時的にロックされました。しばらくしてからお試しください。",
+      "auth/network-request-failed":"通信できませんでした。接続を確認してください。"
+    })[c] || `ログインできませんでした（${c||"エラー"}）。`;
+    $("loginForm").addEventListener("submit", async ev=>{
+      ev.preventDefault(); gateMsg("gateErr",""); gateMsg("gateInfo","");
+      $("loginBtn").disabled=true;
+      try{ await auth.signInWithEmailAndPassword(a, $("lEmail").value.trim(), $("lPass").value); }
+      catch(e){ gateMsg("gateErr", authErr(e.code)); }
+      finally{ $("loginBtn").disabled=false; }
+    });
+    $("resetBtn").onclick=async ()=>{
+      gateMsg("gateErr",""); gateMsg("gateInfo","");
+      const email=$("lEmail").value.trim();
+      if (!email){ gateMsg("gateErr","先にメールアドレスを入力してください。"); $("lEmail").focus(); return; }
+      try{ auth.useDeviceLanguage(a); await auth.sendPasswordResetEmail(a,email); }catch{}
+      gateMsg("gateInfo","登録済みのアドレスなら、パスワード再設定のメールを送りました。届かない場合は迷惑メールフォルダも確認してください。");
+    };
+    // 表示名: 初回ログイン時に入力、右上の名前ボタンで変更
+    const showNameForm=()=>{ $("loginForm").hidden=true; $("nameForm").hidden=false; $("gate").hidden=false; $("nName").value=S.myName||""; $("nName").focus(); };
+    $("nameBtn").onclick=showNameForm;
+    $("nameForm").addEventListener("submit", async ev=>{
+      ev.preventDefault(); const nm=$("nName").value.trim(); if (!nm) return;
+      try{ await auth.updateProfile(a.currentUser,{displayName:nm}); }catch(e){ gateMsg("nameErr","保存できませんでした。もう一度お試しください。"); return; }
+      S.myName=nm; $("nameBtn").textContent=nm; $("gate").hidden=true; start(); heartbeat();
+    });
+    $("logoutBtn").onclick=async ()=>{ try{ await F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} await auth.signOut(a); location.reload(); };
+    let started=false;
+    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); watchPresence(); render(); };
+    auth.onAuthStateChanged(a, u=>{
+      if (!u){ $("gate").hidden=false; $("loginForm").hidden=false; $("nameForm").hidden=true; $("logoutBtn").hidden=true; $("nameBtn").hidden=true; return; }
+      S.me=u.uid; S.myName=u.displayName||"";
+      $("logoutBtn").hidden=false; $("nameBtn").hidden=false; $("nameBtn").textContent=S.myName||"表示名";
+      if (!S.myName){ showNameForm(); return; }
+      $("gate").hidden=true; start();
+    });
+  }catch(e){
+    console.error(e); setStatus("Firebase を読み込めませんでした。設定と通信を確認してください。", true);
+  }
+}
+</script>
+</body>
+</html>
