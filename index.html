@@ -531,22 +531,32 @@ function setStatus(msg, warn){
   el.classList.remove("warn");
   el.textContent = S.demo ? "デモモード" : S.canWrite ? "同時編集オン・変更は自動で共有" : "閲覧のみ";
 }
-// いま開いている人: presence/{uid} に20秒ごとに生存通知、60秒以内の人を表示
-let hbTimer=null;
+// いま開いている人: 画面を表示している間だけ presence/{uid} に3分ごとに生存通知し、
+// 7分以内に通知のあった人を表示。無料枠（1日の読み書き回数）を使い切らないよう間隔を長めにしている。
+const HB_MS=3*60*1000, ALIVE_MS=7*60*1000;
+let hbTimer=null, rawPeers=[];
 async function heartbeat(){
-  if (S.demo||!F||!S.me) return;
+  if (S.demo||!F||!S.me||document.visibilityState!=="visible") return;
   try{ await F.setDoc(F.doc(F.db,"presence",S.me),{name:S.myName,editing:S.editingId||null,lastSeen:Date.now()}); }catch{}
+}
+function leavePresence(){ if (!S.demo&&F&&S.me){ try{ F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} } }
+function refreshPeers(){
+  const now=Date.now();
+  const next=rawPeers.filter(p=>now-(p.lastSeen||0)<ALIVE_MS);
+  const changed = next.length!==S.peers.length || next.some((p,i)=>p!==S.peers[i]);
+  S.peers=next; return changed;
 }
 function watchPresence(){
   F.onSnapshot(F.collection(F.db,"presence"), snap=>{
-    const now=Date.now(), list=[];
-    snap.forEach(d=>{ const p=d.data(); if (now-(p.lastSeen||0)<60000) list.push({uid:d.id,...p}); });
-    S.peers=list; renderPeers(); if (!S.dragId) render();
+    rawPeers=[]; snap.forEach(d=>rawPeers.push({uid:d.id,...d.data()}));
+    refreshPeers(); renderPeers(); if (!S.dragId) render();
   }, ()=>{});
-  heartbeat(); hbTimer=setInterval(heartbeat,20000);
-  setInterval(()=>{ const n=Date.now(); const before=S.peers.length; S.peers=S.peers.filter(p=>n-(p.lastSeen||0)<60000); if (S.peers.length!==before) renderPeers(); },15000);
-  document.addEventListener("visibilitychange",()=>{ if (document.visibilityState==="visible") heartbeat(); });
-  addEventListener("pagehide",()=>{ try{ F.deleteDoc(F.doc(F.db,"presence",S.me)); }catch{} });
+  heartbeat(); hbTimer=setInterval(heartbeat,HB_MS);
+  setInterval(()=>{ if (refreshPeers()){ renderPeers(); if (!S.dragId) render(); } },60*1000);
+  document.addEventListener("visibilitychange",()=>{
+    if (document.visibilityState==="visible") heartbeat(); else if (!S.editingId) leavePresence();
+  });
+  addEventListener("pagehide",leavePresence);
 }
 function renderPeers(){
   const box=$("peers"); box.replaceChildren();
