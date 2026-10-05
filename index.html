@@ -20,6 +20,7 @@
   --bg:#f3f4f2; --surface:#ffffff; --surface-2:#eceeeb; --fg:#1d2321; --muted:#68716d; --line:#d9ddd9;
   --west:#2e7a68; --west-soft:#e2f0ec; --east:#34508f; --east-soft:#e4e9f5;
   --sun:#b8433a; --sat:#3f63a8; --today:#fff6d9; --focus:#c08a1e;
+  --c-car:#a8650f; --c-leave:#c0396b; --c-meeting:#6a4cc0; --c-out:#557a12; --c-visitor:#0f7c86;
   --f-display:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -28,11 +29,13 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141817; --surface:#1c2120; --surface-2:#232927; --fg:#e7ebe9; --muted:#97a19d; --line:#323936;
   --west:#6cc3ad; --west-soft:#1f322d; --east:#8ea8e6; --east-soft:#222a3d;
-  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d; color-scheme:dark}}
+  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d;
+  --c-car:#e2a54a; --c-leave:#f08ab0; --c-meeting:#b39cf5; --c-out:#a6cc5e; --c-visitor:#5fcfd8; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141817; --surface:#1c2120; --surface-2:#232927; --fg:#e7ebe9; --muted:#97a19d; --line:#323936;
   --west:#6cc3ad; --west-soft:#1f322d; --east:#8ea8e6; --east-soft:#222a3d;
-  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d; color-scheme:dark}
+  --sun:#ef8a80; --sat:#8ea8e6; --today:#2f2a1a; --focus:#e5b44d;
+  --c-car:#e2a54a; --c-leave:#f08ab0; --c-meeting:#b39cf5; --c-out:#a6cc5e; --c-visitor:#5fcfd8; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 :root{color-scheme:light;padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}
@@ -95,6 +98,15 @@ button,input,textarea,select{font:inherit;color:inherit}
 .lane[data-region="east"] .no{background:var(--east)}
 .item .body{min-width:0}
 .item .t{font-weight:500;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:3px 6px;border-radius:4px;margin-right:6px;vertical-align:1px;color:var(--tc);background:color-mix(in srgb,var(--tc) 14%,transparent);border:1px solid color-mix(in srgb,var(--tc) 40%,transparent)}
+.tag.mini{font-size:9px;padding:1px 3px;margin-right:3px;vertical-align:1px}
+.cat-car{--tc:var(--c-car)} .cat-leave{--tc:var(--c-leave)} .cat-meeting{--tc:var(--c-meeting)} .cat-out{--tc:var(--c-out)} .cat-visitor{--tc:var(--c-visitor)}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.cats label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px;color:var(--fg)}
+.cats input{position:absolute;opacity:0;pointer-events:none}
+.cats label:has(input:checked){border-color:var(--tc,var(--fg));background:color-mix(in srgb,var(--tc,var(--fg)) 14%,transparent);color:var(--tc,var(--fg));font-weight:700}
+.cats label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+.cats .none{--tc:var(--muted)}
 .item .m{font-size:12px;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .item .mv{display:flex;flex-direction:column;gap:1px}
 .item .mv button{border:0;background:transparent;color:var(--muted);font-size:10px;line-height:1;padding:2px 4px;cursor:pointer;border-radius:4px}
@@ -111,6 +123,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .cell:nth-child(7n){border-right:0}
 .cell:hover{background:var(--surface-2)}
 .cell.out{opacity:.45}
+.cell.past{opacity:.6}
+.wrow.past .dlabel{opacity:.6}
 .cell.today{background:var(--today)}
 .cell .cd{font-family:var(--f-num);font-size:12px;display:flex;gap:4px;align-items:baseline;min-width:0}
 .cell .cd small{font-family:var(--f-body);font-size:10px;color:var(--sun);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -124,7 +138,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .half .more{font-size:10px;color:var(--muted)}
 .half .cnt{display:none;font-family:var(--f-num);font-size:11px;text-align:center}
 .half.west .cnt{color:var(--west)} .half.east .cnt{color:var(--east)}
-.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
 .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 
 .empty-note{font-size:13px;color:var(--muted);padding:0 2px}
@@ -195,11 +209,11 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
     <h2 class="period" id="period"></h2>
     <div class="seg" role="group" aria-label="表示">
       <button id="vWeek" aria-pressed="true">週</button>
-      <button id="vMonth" aria-pressed="false">月</button>
+      <button id="vMonth" aria-pressed="false">5週間</button>
     </div>
   </nav>
 
-  <p class="empty-note" id="emptyNote" hidden>この期間の予定はまだありません。日付の「＋ 追加」から入れると、全員の画面にすぐ反映されます。</p>
+  <p class="empty-note" id="emptyNote" hidden>先週から3週間後までの予定を表示します。まだ予定はありません。日付の「＋ 追加」から入れると、全員の画面にすぐ反映されます。</p>
   <main id="view"></main>
 </div>
 
@@ -215,6 +229,16 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
       <div class="regions">
         <label><input type="radio" name="region" id="fWest" value="west">西日本</label>
         <label><input type="radio" name="region" id="fEast" value="east">東日本</label>
+      </div>
+    </div>
+    <div class="field"><span class="lb">種類</span>
+      <div class="cats" id="fCats" role="radiogroup" aria-label="種類">
+        <label class="none"><input type="radio" name="cat" value="" id="cat0" checked>なし</label>
+        <label class="cat-car"><input type="radio" name="cat" value="car" id="cat1">車両関係</label>
+        <label class="cat-leave"><input type="radio" name="cat" value="leave" id="cat2">休暇</label>
+        <label class="cat-meeting"><input type="radio" name="cat" value="meeting" id="cat3">MT</label>
+        <label class="cat-out"><input type="radio" name="cat" value="out" id="cat4">外出</label>
+        <label class="cat-visitor"><input type="radio" name="cat" value="visitor" id="cat5">来客</label>
       </div>
     </div>
     <div class="field"><label for="fTitle">内容</label><input id="fTitle" required maxlength="120" placeholder="例: 大阪支店 打ち合わせ"></div>
@@ -266,10 +290,40 @@ const firebaseConfig = {
 const FB = "https://www.gstatic.com/firebasejs/11.10.0/";
 
 const REGIONS = [{k:"west",n:"西日本"},{k:"east",n:"東日本"}];
+const CATS = {car:"車両関係", leave:"休暇", meeting:"MT", out:"外出", visitor:"来客"};   // 入力画面の名前
+const CAT_LABEL = {car:"車両関係", leave:"休暇", meeting:"MT", out:"外出", visitor:"客"};  // 週表示の札
+const CAT_SHORT = {car:"車", leave:"休", meeting:"MT", out:"外", visitor:"客"};          // 5週間表示の札
 const WD = ["月","火","水","木","金","土","日"];
-const HOL = {
-"2026-01-01":"元日","2026-01-12":"成人の日","2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日","2026-03-20":"春分の日","2026-04-29":"昭和の日","2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日","2026-05-06":"振替休日","2026-07-20":"海の日","2026-08-11":"山の日","2026-09-21":"敬老の日","2026-09-22":"国民の休日","2026-09-23":"秋分の日","2026-10-12":"スポーツの日","2026-11-03":"文化の日","2026-11-23":"勤労感謝の日",
-"2027-01-01":"元日","2027-01-11":"成人の日","2027-02-11":"建国記念の日","2027-02-23":"天皇誕生日","2027-03-21":"春分の日","2027-03-22":"振替休日","2027-04-29":"昭和の日","2027-05-03":"憲法記念日","2027-05-04":"みどりの日","2027-05-05":"こどもの日","2027-07-19":"海の日","2027-08-11":"山の日","2027-09-20":"敬老の日","2027-09-23":"秋分の日","2027-10-11":"スポーツの日","2027-11-03":"文化の日","2027-11-23":"勤労感謝の日"};
+// 日本の祝日を年ごとに計算（祝日法に基づく。春分・秋分は 1980〜2099 年の近似式）
+const holCache = {};
+function holidaysOf(y){
+  if (holCache[y]) return holCache[y];
+  const p2=n=>String(n).padStart(2,"0"), key=(m,d)=>`${y}-${p2(m)}-${p2(d)}`;
+  const nthMon=(m,n)=>{ const w=new Date(y,m-1,1).getDay(); return 1+((8-w)%7)+(n-1)*7; };
+  const H={};
+  const add=(m,d,n)=>{ H[key(m,d)]=n; };
+  add(1,1,"元日"); add(1,nthMon(1,2),"成人の日"); add(2,11,"建国記念の日");
+  if (y>=2020) add(2,23,"天皇誕生日");
+  const k=y-1980, q=Math.floor(k/4);
+  add(3,Math.floor(20.8431+0.242194*k-q),"春分の日");
+  add(4,29,"昭和の日"); add(5,3,"憲法記念日"); add(5,4,"みどりの日"); add(5,5,"こどもの日");
+  add(7,nthMon(7,3),"海の日"); add(8,11,"山の日"); add(9,nthMon(9,3),"敬老の日");
+  add(9,Math.floor(23.2488+0.242194*k-q),"秋分の日");
+  add(10,nthMon(10,2),"スポーツの日"); add(11,3,"文化の日"); add(11,23,"勤労感謝の日");
+  const base=Object.keys(H).sort();
+  // 国民の休日（祝日に挟まれた平日）
+  for (const s of base){ const d=new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8)); d.setDate(d.getDate()+2);
+    const s2=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; d.setDate(d.getDate()-1);
+    const mid=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+    if (H[s2] && !H[mid] && d.getDay()!==0) H[mid]="国民の休日"; }
+  // 振替休日（日曜の祝日の後の最初の平日）
+  for (const s of Object.keys(H).sort()){ const d=new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8));
+    if (d.getDay()!==0) continue;
+    do { d.setDate(d.getDate()+1); } while (H[`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`]);
+    H[`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`]="振替休日"; }
+  return holCache[y]=H;
+}
+const holidayName = s => holidaysOf(+s.slice(0,4))[s] || "";
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs={}, ...kids) => { const e=document.createElement(tag);
@@ -282,54 +336,128 @@ const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return
 const monday = d => addDays(d, -((d.getDay()+6)%7));
 const todayStr = () => ymd(new Date());
 
+// ---------- 表示できる期間：先週の月曜〜3週間後の日曜（5週間） ----------
+const WEEKS = 5;
+const REL = ["先週","今週","来週","再来週","3週間後"];
+const winStart = () => addDays(monday(new Date()), -7);
+const winEnd = () => addDays(winStart(), WEEKS*7-1);
+const weekIdOf = ds => ymd(monday(new Date(+ds.slice(0,4), +ds.slice(5,7)-1, +ds.slice(8))));
+const winWeekIds = () => Array.from({length:WEEKS}, (_,i)=>ymd(addDays(winStart(), i*7)));
+const inWindow = ds => ds>=ymd(winStart()) && ds<=ymd(winEnd());
+function clampAnchor(){
+  const lo=winStart(), hi=addDays(lo,(WEEKS-1)*7), m=monday(S.anchor);
+  if (m<lo) S.anchor=lo; else if (m>hi) S.anchor=hi;
+}
+
 // ---------- state ----------
 const S = {
   view:"week", anchor:new Date(), events:new Map(),
   me:null, myName:"", canWrite:true, demo:!firebaseConfig.apiKey,
-  dragId:null, pendingRender:false, unsub:null, rangeKey:"", flashDate:null
+  dragId:null, pendingRender:false, unsub:null, winKey:"", flashDate:null
 };
-try { const v=localStorage.getItem("tozai.view"); if (v==="month"||v==="week") S.view=v; } catch {}
+try { const v=localStorage.getItem("tozai.view"); if (v==="all"||v==="week") S.view=v; } catch {}
 
 let F = null; // Firebase の関数とインスタンス
 
-// ---------- store（Firestore / デモ用ローカル保存） ----------
+// ---------- 保存先 ----------
+// Firestore では「weeks/{その週の月曜の日付}」の1ドキュメントに、1週間分の予定を
+// events: { 予定ID: {...} } としてまとめて保存する。表示中の5週間＝最大5ドキュメントを読むだけで済む。
+const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 function demoSave(){ try{ localStorage.setItem("tozai.demo", JSON.stringify([...S.events])); }catch{} }
 function demoLoad(){ try{ S.events=new Map(JSON.parse(localStorage.getItem("tozai.demo")||"[]")); }catch{ S.events=new Map(); } }
-const store = {
-  async add(data){
-    if (S.demo){ S.events.set("l"+Math.random().toString(36).slice(2), data); demoSave(); render(); return; }
-    await F.addDoc(F.collection(F.db,"events"), data);
-  },
-  async update(id,data){
-    if (S.demo){ S.events.set(id,{...S.events.get(id),...data}); demoSave(); render(); return; }
-    await F.updateDoc(F.doc(F.db,"events",id), data);
-  },
-  async remove(id){
-    if (S.demo){ S.events.delete(id); demoSave(); render(); return; }
-    await F.deleteDoc(F.doc(F.db,"events",id));
+const clean = e => { const o={...e}; delete o.id; return o; };
+// changes の各要素は次のどれか:
+//   {id, create:{...}}  新しい予定
+//   {id, patch:{...}}   変えた項目だけ（同時に別の人が別の項目を変えても消し合わない）
+//   {id, del:true}      削除
+// Firestore ではトランザクションで「サーバー上の最新の週データ」を読んでから書くので、
+// 同じ週を複数人が同時に編集しても、他の人の変更を古い内容で上書きしない。
+class Gone extends Error { constructor(){ super("gone"); this.code="gone"; } }
+async function commit(changes){
+  if (S.demo){
+    for (const c of changes){
+      if (c.del) S.events.delete(c.id);
+      else if (c.create) S.events.set(c.id, {...c.create});
+      else { const e=S.events.get(c.id); if (!e) throw new Gone(); S.events.set(c.id, {...e, ...c.patch}); }
+    }
+    pruneLocal(); demoSave(); render(); return;
   }
-};
-
-function range(){
-  if (S.view==="week"){ const s=monday(S.anchor); return [s, addDays(s,6)]; }
-  const s=monday(new Date(S.anchor.getFullYear(), S.anchor.getMonth(), 1)); return [s, addDays(s,41)];
+  await F.runTransaction(F.db, async tx=>{
+    // 1) 関係する週をすべて読む（トランザクションでは読み込みを先に済ませる）
+    const need=new Set();
+    for (const c of changes){
+      const loc=S.events.get(c.id);
+      if (loc) need.add(weekIdOf(loc.date));
+      if (c.create) need.add(weekIdOf(c.create.date));
+      if (c.patch && c.patch.date) need.add(weekIdOf(c.patch.date));
+    }
+    const docs={};
+    for (const w of need){ const snap=await tx.get(F.doc(F.db,"weeks",w)); docs[w]=snap.exists() ? ((snap.data()||{}).events||{}) : null; }
+    const findOnServer=id=>{ for (const [w,evs] of Object.entries(docs)) if (evs && evs[id] && evs[id].date) return [w, evs[id]]; return [null,null]; };
+    // 2) サーバーの最新版に変更を重ねて書く
+    const upd={}, sets={};
+    for (const c of changes){
+      if (c.create){ (sets[weekIdOf(c.create.date)] ||= {})[c.id]={...c.create}; continue; }
+      const [w, ev]=findOnServer(c.id);
+      if (c.del){ if (w) (upd[w] ||= {})["events."+c.id]=F.deleteField(); continue; }
+      if (!w) throw new Gone();                     // ほかの人が先に削除していた
+      const next={...ev, ...c.patch}, nw=weekIdOf(next.date);
+      if (nw===w){ for (const [k,v] of Object.entries(c.patch)) (upd[w] ||= {})[`events.${c.id}.${k}`]=v; }
+      else { (upd[w] ||= {})["events."+c.id]=F.deleteField(); (sets[nw] ||= {})[c.id]=next; }
+    }
+    for (const [w,p] of Object.entries(upd)) tx.update(F.doc(F.db,"weeks",w), p);
+    for (const [w,evs] of Object.entries(sets)) tx.set(F.doc(F.db,"weeks",w), {events:evs}, {merge:true});
+  });
 }
+const store = {
+  add: data => commit([{id:newId(), create:data}]),
+  update: (id,patch) => commit([{id, patch}]),
+  remove: id => commit([{id, del:true}])
+};
+function pruneLocal(){ // デモ用：期間より前の予定を消す
+  const lo=ymd(winStart()); for (const [id,e] of S.events) if (e.date<lo) S.events.delete(id);
+}
+
 function subscribe(){
   if (S.demo || !F) return;
-  const [s,e]=range(); const key=ymd(s)+"_"+ymd(e);
-  if (key===S.rangeKey) return; S.rangeKey=key;
+  const ids=winWeekIds(), key=ids[0];
+  if (key===S.winKey) return; S.winKey=key;
   if (S.unsub) S.unsub();
-  const q=F.query(F.collection(F.db,"events"), F.where("date",">=",ymd(s)), F.where("date","<=",ymd(e)));
+  const q=F.query(F.collection(F.db,"weeks"), F.where(F.documentId(),"in",ids));
   S.unsub=F.onSnapshot(q, snap=>{
-    const m=new Map(); snap.forEach(d=>m.set(d.id,d.data()));
+    const m=new Map();
+    snap.forEach(d=>{ const evs=(d.data()||{}).events||{}; for (const [id,e] of Object.entries(evs)) if (e && e.date) m.set(id,e); });
     S.events=m; setStatus(); checkConflict();
     if (S.dragId) S.pendingRender=true; else render();
   }, err=>{
-    S.rangeKey="";
+    S.winKey="";
     if (err.code==="permission-denied") setStatus("このアカウントには閲覧権限がありません。管理者に追加を依頼してください。", true);
     else setStatus("接続が切れました。ページを再読み込みしてください。", true);
   });
 }
+
+// 先週より前の週のデータを削除（各端末で1日1回まで。誰か1人が開けば消える）
+async function cleanupOld(){
+  if (S.demo || !F || !S.canWrite) return;
+  const today=todayStr();
+  try{ if (localStorage.getItem("tozai.cleanup")===today) return; }catch{}
+  try{
+    const q=F.query(F.collection(F.db,"weeks"), F.where(F.documentId(),"<",ymd(winStart())), F.limit(20));
+    const snap=await F.getDocs(q);
+    for (const d of snap.docs) await F.deleteDoc(d.ref);
+    try{ localStorage.setItem("tozai.cleanup", today); }catch{}
+  }catch(e){ console.warn("cleanup", e); }
+}
+
+// 日付が変わって表示期間がずれたら読み直す
+let lastWin=ymd(winStart());
+function checkRollover(){
+  const w=ymd(winStart()); if (w===lastWin) return;
+  lastWin=w; clampAnchor(); if (S.demo){ pruneLocal(); demoSave(); }
+  subscribe(); cleanupOld(); render();
+}
+setInterval(checkRollover, 5*60*1000);
+document.addEventListener("visibilitychange",()=>{ if (document.visibilityState==="visible") checkRollover(); });
 
 // ---------- helpers ----------
 function listFor(date, region, exclude){
@@ -343,32 +471,40 @@ function orderAt(list, idx){
   return (list[idx-1].order+list[idx].order)/2;
 }
 const stamp = () => ({updatedAt:Date.now(), updatedBy:S.me||null, updatedByName:S.myName||""});
-async function placeAt(id, date, region, idx){
-  const list=listFor(date,region,id);
+async function placeAt(id, date, region, idx, extra={}){
+  const list=listFor(date,region,id), me=S.events.get(id);
+  const where = (me.date!==date ? {date} : {}), reg = (me.region!==region ? {region} : {});
   const tight = idx>0 && idx<list.length && (list[idx].order-list[idx-1].order)<1e-6;
-  if (tight){ // 間隔が詰まったら番号を振り直す
+  if (tight){ // 間隔が詰まったら番号を振り直す（1回の保存でまとめて）
     const all=[...list]; all.splice(idx,0,{id});
-    for (let i=0;i<all.length;i++){ const patch={order:(i+1)*1024}; if (all[i].id===id) Object.assign(patch,{date,region,...stamp()}); await store.update(all[i].id,patch); }
+    await commit(all.map((x,i)=> x.id===id
+      ? {id, patch:{...extra, ...where, ...reg, order:(i+1)*1024, ...stamp()}}
+      : {id:x.id, patch:{order:(i+1)*1024}}));
     return;
   }
-  await store.update(id,{date,region,order:orderAt(list,idx),...stamp()});
+  await commit([{id, patch:{...extra, ...where, ...reg, order:orderAt(list,idx), ...stamp()}}]);
 }
 
 // ---------- rendering ----------
 function render(){
-  S.pendingRender=false;
+  S.pendingRender=false; clampAnchor();
   $("vWeek").setAttribute("aria-pressed", S.view==="week");
-  $("vMonth").setAttribute("aria-pressed", S.view==="month");
-  const view=$("view"); view.replaceChildren(S.view==="week"?renderWeek():renderMonth());
+  $("vMonth").setAttribute("aria-pressed", S.view==="all");
+  const wi=Math.round((monday(S.anchor)-winStart())/(7*864e5));
+  $("prevBtn").disabled = S.view!=="week" || wi<=0;
+  $("nextBtn").disabled = S.view!=="week" || wi>=WEEKS-1;
+  const view=$("view"); view.replaceChildren(S.view==="week"?renderWeek():renderAll());
   $("emptyNote").hidden = S.events.size>0 || !S.canWrite;
   if (S.flashDate){ const r=view.querySelector(`[data-row="${S.flashDate}"]`); if (r){ r.classList.add("flash"); r.scrollIntoView({block:"nearest"}); } S.flashDate=null; }
 }
+const md = d => `${d.getMonth()+1}/${d.getDate()}`;
 function periodLabel(){
-  if (S.view==="month") return `${S.anchor.getFullYear()}年${S.anchor.getMonth()+1}月`;
+  if (S.view==="all") return `${md(winStart())}〜${md(winEnd())}`;
   const s=monday(S.anchor), e=addDays(s,6);
-  return s.getMonth()===e.getMonth() ? `${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日〜${e.getDate()}日` : `${s.getFullYear()}年${s.getMonth()+1}/${s.getDate()}〜${e.getMonth()+1}/${e.getDate()}`;
+  const wi=Math.round((s-winStart())/(7*864e5));
+  return `${REL[wi]||""}　${md(s)}〜${md(e)}`;
 }
-function dayClass(d){ const s=ymd(d), w=d.getDay(); return [w===0?"sun":"", w===6?"sat":"", HOL[s]?"hol":"", s===todayStr()?"today":""].filter(Boolean).join(" "); }
+function dayClass(d){ const s=ymd(d), w=d.getDay(); return [w===0?"sun":"", w===6?"sat":"", holidayName(s)?"hol":"", s===todayStr()?"today":"", s<todayStr()?"past":""].filter(Boolean).join(" "); }
 
 function renderWeek(){
   $("period").textContent=periodLabel();
@@ -378,7 +514,7 @@ function renderWeek(){
   for (let i=0;i<7;i++){
     const d=addDays(s,i), ds=ymd(d);
     const row=h("div",{class:"wrow "+dayClass(d),"data-row":ds},
-      h("div",{class:"dlabel"}, h("span",{class:"d",text:`${d.getMonth()+1}/${d.getDate()}`}), h("span",{class:"w",text:WD[i]+"曜日"}), HOL[ds]?h("span",{class:"hol",text:HOL[ds]}):null));
+      h("div",{class:"dlabel"}, h("span",{class:"d",text:`${d.getMonth()+1}/${d.getDate()}`}), h("span",{class:"w",text:WD[i]+"曜日"}), holidayName(ds)?h("span",{class:"hol",text:holidayName(ds)}):null));
     for (const r of REGIONS) row.append(renderLane(ds,r.k));
     wrap.append(row);
   }
@@ -393,7 +529,7 @@ function renderLane(ds, region){
       onclick:ev=>{ if (ev.target.closest(".mv")) return; openDialog(e.id); },
       onkeydown:ev=>{ if (ev.key==="Enter"&&ev.target===it) openDialog(e.id); }},
       h("span",{class:"no",text:String(idx+1)}),
-      h("div",{class:"body"}, h("div",{class:"t",text:e.title||"(無題)"}), e.memo?h("div",{class:"m",text:e.memo}):null),
+      h("div",{class:"body"}, h("div",{class:"t"}, CATS[e.category]?h("span",{class:"tag cat-"+e.category,text:CAT_LABEL[e.category]}):null, e.title||"(無題)"), e.memo?h("div",{class:"m",text:e.memo}):null),
       S.canWrite?h("div",{class:"mv"},
         h("button",{type:"button","aria-label":"上へ",disabled:idx===0,onclick:()=>move(e.id,ds,region,idx-1),text:"▲"}),
         h("button",{type:"button","aria-label":"下へ",disabled:idx===items.length-1,onclick:()=>move(e.id,ds,region,idx+1),text:"▼"})):h("span"));
@@ -417,27 +553,27 @@ function clearIns(){ document.querySelectorAll(".ins").forEach(x=>x.remove()); d
 function showIns(lane,idx){ clearIns(); lane.classList.add("drop"); const items=[...lane.querySelectorAll(".item:not(.dragging)")]; const mark=h("div",{class:"ins"}); lane.insertBefore(mark, idx<items.length?items[idx]:lane.querySelector(".add")); }
 async function move(id,ds,region,toIdx){ try{ await placeAt(id,ds,region,toIdx); }catch(err){ failed(err); } }
 
-function renderMonth(){
+function renderAll(){
   $("period").textContent=periodLabel();
   const box=h("div",{class:"month"});
   box.append(h("div",{class:"mgrid mhead"}, WD.map(w=>h("div",{text:w}))));
-  const grid=h("div",{class:"mgrid"}); const [s]=range(); const m=S.anchor.getMonth();
-  for (let i=0;i<42;i++){
+  const grid=h("div",{class:"mgrid"}); const s=winStart();
+  for (let i=0;i<WEEKS*7;i++){
     const d=addDays(s,i), ds=ymd(d);
-    const cell=h("button",{type:"button",class:"cell "+dayClass(d)+(d.getMonth()!==m?" out":""),"aria-label":`${d.getMonth()+1}月${d.getDate()}日の週を開く`,
-      onclick:()=>{ S.anchor=d; S.view="week"; S.flashDate=ds; saveView(); go(); }},
-      h("span",{class:"cd"}, String(d.getDate()), HOL[ds]?h("small",{text:HOL[ds]}):null));
+    const cell=h("button",{type:"button",class:"cell "+dayClass(d),"aria-label":`${d.getMonth()+1}月${d.getDate()}日の週を開く`,
+      onclick:()=>{ S.anchor=d; S.view="week"; S.flashDate=ds; saveView(); render(); }},
+      h("span",{class:"cd"}, d.getDate()===1||i===0?`${d.getMonth()+1}/${d.getDate()}`:String(d.getDate()), holidayName(ds)?h("small",{text:holidayName(ds)}):null));
     const halves=h("div",{class:"halves"});
     for (const r of REGIONS){
       const items=listFor(ds,r.k); const half=h("div",{class:"half "+r.k,title:r.n});
-      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li",text:`${j+1}. ${e.title||"(無題)"}`})));
+      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li"}, `${j+1}. `, CATS[e.category]?h("span",{class:"tag mini cat-"+e.category,text:CAT_SHORT[e.category],title:CATS[e.category]}):null, e.title||"(無題)")));
       if (items.length>3) half.append(h("div",{class:"more",text:`ほか${items.length-3}件`}));
       if (items.length) half.append(h("div",{class:"cnt",text:String(items.length)}));
       halves.append(half);
     }
     cell.append(halves); grid.append(cell);
   }
-  box.append(grid, h("div",{class:"legend"}, h("span",{},h("b",{style:"background:var(--west)"}),"左＝西日本"), h("span",{},h("b",{style:"background:var(--east)"}),"右＝東日本"), h("span",{text:"日付を押すとその週を開きます"})));
+  box.append(grid, h("div",{class:"legend"}, h("span",{},h("b",{style:"background:var(--west)"}),"左＝西日本"), h("span",{},h("b",{style:"background:var(--east)"}),"右＝東日本"), h("span",{}, ...Object.keys(CATS).map(k=>h("span",{class:"tag mini cat-"+k,text:CAT_SHORT[k],title:CATS[k]}))," 種類"), h("span",{text:"日付を押すとその週を開きます"})));
   return box;
 }
 
@@ -453,9 +589,11 @@ function openDialog(id, date, region){
   const e = id ? S.events.get(id) : null; if (id && !e) return;
   cur={id, base:e?{...e}:null};
   $("dlgTitle").textContent = id ? (S.canWrite?"予定を編集":"予定") : "予定を追加";
+  $("fDate").min=ymd(winStart()); $("fDate").max=ymd(winEnd());
   $("fDate").value = e ? e.date : date;
   ((e?e.region:region)==="east" ? $("fEast") : $("fWest")).checked=true;
   $("fTitle").value = e?(e.title||""):""; $("fMemo").value = e?(e.memo||""):"";
+  const cv=e&&CATS[e.category]?e.category:""; for (const r of dlg.querySelectorAll('input[name="cat"]')) r.checked=(r.value===cv);
   fillOrderSelect($("fDate").value, regionVal(), id, id ? listFor(e.date,e.region).findIndex(x=>x.id===id) : null);
   $("delBtn").hidden = !id || !S.canWrite; disarm();
   $("conflict").hidden=true; $("saveBtn").disabled=false;
@@ -486,20 +624,23 @@ $("reloadBtn").onclick=()=>openDialog(cur.id);
 $("form").addEventListener("submit", async ev=>{
   ev.preventDefault(); if (!S.canWrite) return;
   const title=$("fTitle").value.trim(); if (!title){ $("fTitle").focus(); return; }
+  const category=(dlg.querySelector('input[name="cat"]:checked')||{}).value||"";
   const date=$("fDate").value, region=regionVal(), idx=Number($("fOrder").value), memo=$("fMemo").value.trim();
+  if (!inWindow(date)){ toast(`日付は ${md(winStart())}〜${md(winEnd())} の間で選んでください`); $("fDate").focus(); return; }
   $("saveBtn").disabled=true;
   try{
     if (!cur.id){
-      await store.add({date,region,title,memo,order:orderAt(listFor(date,region),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
+      await store.add({date,region,category,title,memo,order:orderAt(listFor(date,region),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
       toast("追加しました");
     } else {
       const b=cur.base, patch={};
       if (title!==(b.title||"")) patch.title=title;
       if (memo!==(b.memo||"")) patch.memo=memo;
+      if (category!==(b.category||"")) patch.category=category;
       const oldIdx=listFor(b.date,b.region).findIndex(x=>x.id===cur.id);
       const moved = date!==b.date || region!==b.region || idx!==oldIdx;
-      if (Object.keys(patch).length) await store.update(cur.id,{...patch,...stamp()});
-      if (moved) await placeAt(cur.id,date,region,idx);
+      if (moved) await placeAt(cur.id,date,region,idx,patch);
+      else if (Object.keys(patch).length) await store.update(cur.id,{...patch,...stamp()});
       toast("保存しました");
     }
     closeDialog();
@@ -516,12 +657,11 @@ $("delBtn").onclick=async ()=>{
 
 // ---------- nav ----------
 function saveView(){ try{ localStorage.setItem("tozai.view",S.view); }catch{} }
-function go(){ subscribe(); render(); }
-$("todayBtn").onclick=()=>{ S.anchor=new Date(); S.flashDate=S.view==="week"?todayStr():null; go(); };
-$("prevBtn").onclick=()=>{ S.anchor = S.view==="week" ? addDays(S.anchor,-7) : new Date(S.anchor.getFullYear(),S.anchor.getMonth()-1,1); go(); };
-$("nextBtn").onclick=()=>{ S.anchor = S.view==="week" ? addDays(S.anchor,7) : new Date(S.anchor.getFullYear(),S.anchor.getMonth()+1,1); go(); };
-$("vWeek").onclick=()=>{ S.view="week"; saveView(); go(); };
-$("vMonth").onclick=()=>{ S.view="month"; saveView(); go(); };
+$("todayBtn").onclick=()=>{ S.anchor=new Date(); S.view="week"; S.flashDate=todayStr(); saveView(); render(); };
+$("prevBtn").onclick=()=>{ S.anchor=addDays(S.anchor,-7); render(); };
+$("nextBtn").onclick=()=>{ S.anchor=addDays(S.anchor,7); render(); };
+$("vWeek").onclick=()=>{ S.view="week"; saveView(); render(); };
+$("vMonth").onclick=()=>{ S.view="all"; saveView(); render(); };
 
 // ---------- status ----------
 function setStatus(msg, warn){
@@ -533,6 +673,8 @@ function setStatus(msg, warn){
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); setTimeout(()=>t.remove(),1800); }
 function failed(err){
   console.error(err);
+  if (err && err.code==="gone"){ toast("この予定はほかの人が先に削除していました"); closeDialog(); return; }
+  if (err && (err.code==="unavailable"||err.code==="failed-precondition")){ toast("通信できないため保存できませんでした。接続を確認してもう一度お試しください"); return; }
   if (err && err.code==="permission-denied"){ S.canWrite=false; setStatus(); render(); toast("このアカウントには編集権限がありません"); return; }
   toast("保存できませんでした。通信を確認してもう一度お試しください");
 }
@@ -540,7 +682,7 @@ function failed(err){
 // ---------- 起動 ----------
 render();
 if (S.demo){
-  demoLoad(); $("demoNote").hidden=false; setStatus(); render();
+  demoLoad(); pruneLocal(); demoSave(); $("demoNote").hidden=false; setStatus(); render();
 } else {
   setStatus("読み込み中…");
   try{
@@ -584,7 +726,7 @@ if (S.demo){
     });
     $("logoutBtn").onclick=async ()=>{ await auth.signOut(a); location.reload(); };
     let started=false;
-    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); render(); };
+    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); render(); cleanupOld(); };
     auth.onAuthStateChanged(a, u=>{
       if (!u){ $("gate").hidden=false; $("loginForm").hidden=false; $("nameForm").hidden=true; $("logoutBtn").hidden=true; $("nameBtn").hidden=true; return; }
       S.me=u.uid; S.myName=u.displayName||"";
