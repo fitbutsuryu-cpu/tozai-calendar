@@ -39,11 +39,12 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 :root{color-scheme:light;padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}
-body{margin:0}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;padding:16px;padding-block:16px 48px}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:clip}
+body{margin:0;overflow-x:clip}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:16px 48px}
 button,input,textarea,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 
 /* header */
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
@@ -58,6 +59,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:6px 12px;cursor:pointer;line-height:1.3}
 .btn:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.35;cursor:default;background:var(--surface)}
 .btn.icon{padding:6px 10px;font-family:var(--f-num)}
 .btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .btn.danger{color:var(--sun)}
@@ -103,7 +105,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .cat-car{--tc:var(--c-car)} .cat-leave{--tc:var(--c-leave)} .cat-meeting{--tc:var(--c-meeting)} .cat-out{--tc:var(--c-out)} .cat-visitor{--tc:var(--c-visitor)}
 .cats{display:flex;flex-wrap:wrap;gap:6px}
 .cats label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px;color:var(--fg)}
-.cats input{position:absolute;opacity:0;pointer-events:none}
+.cats label{position:relative}
+.cats input{position:absolute;inset:0;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
 .cats label:has(input:checked){border-color:var(--tc,var(--fg));background:color-mix(in srgb,var(--tc,var(--fg)) 14%,transparent);color:var(--tc,var(--fg));font-weight:700}
 .cats label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
 .cats .none{--tc:var(--muted)}
@@ -160,10 +163,11 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
 .regions label:has(input[value="east"]:checked){background:var(--east-soft);border-color:var(--east);color:var(--east);font-weight:700}
 .notice{font-size:13px;border-radius:var(--r);padding:8px 10px;background:var(--today);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .notice button{margin-left:auto}
+.notice.perm code{font-family:var(--f-num);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px;user-select:all;overflow-wrap:anywhere}
 .meta{font-size:12px;color:var(--muted)}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
 .acts .sp{flex:1}
-.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:20}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:20;max-width:calc(100vw - 32px);text-align:center}
 
 .gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;padding:16px;z-index:30}
 .gate .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;max-width:380px;width:100%;display:grid;gap:14px;text-align:center}
@@ -173,6 +177,26 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
 .gate .field{text-align:left}
 .linkbtn{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:2px}
 @media (max-width:640px){
+  /* iPhone は 16px 未満の入力欄を押すと画面を拡大してしまうため 16px にする */
+  input,select,textarea{font-size:16px!important}
+  body{padding-inline:max(12px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-right,0px));padding-block:12px 40px}
+  .wrap{gap:10px}
+  .top{gap:6px 8px;flex-wrap:nowrap}
+  .brand{font-size:17px;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;flex:1}
+  @media (max-width:370px){ .brand{font-size:15px} .bar .btn{padding:6px 8px} }
+  .brand .mark{display:none}
+  .status:not(.warn){display:none}
+  .status.warn{position:fixed;left:12px;right:12px;bottom:calc(64px + env(safe-area-inset-bottom,0px));background:var(--surface);border:1px solid var(--sun);border-radius:8px;padding:8px 10px;z-index:15}
+  .top .btn{padding:5px 9px;font-size:13px;white-space:nowrap;flex:none}
+  .spacer{display:none}
+  #nameBtn{max-width:7.5em;overflow:hidden;text-overflow:ellipsis}
+  .bar{gap:6px;flex-wrap:wrap}
+  .bar .seg{margin-left:auto}
+  .bar .btn{padding:6px 10px}
+  .period{order:-1;flex:1 0 100%;font-size:17px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .seg button{padding:6px 10px;font-size:13px;white-space:nowrap}
+  .dlg{padding:16px;gap:12px}
+  .cats label{padding:5px 10px}
   .wrow{grid-template-columns:1fr 1fr}
   .wrow .dlabel{grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:8px;padding:8px 10px 2px}
   .wrow.head .sp0{display:none}
@@ -200,6 +224,11 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
     <button class="btn" id="nameBtn" hidden title="表示名を変更"></button>
     <button class="btn" id="logoutBtn" hidden>ログアウト</button>
   </header>
+  <div class="notice perm" id="permNote" hidden>
+    <span>このアカウントは、まだカレンダーの利用者に登録されていません。下のUIDを管理者に伝え、Firebase のルール（firestore.rules）の一覧に追加してもらってください。ルールが最新版になっていない場合にも表示されます。</span>
+    <code id="myUid"></code>
+    <button type="button" class="btn" id="copyUid">UIDをコピー</button>
+  </div>
   <p class="notice" id="demoNote" hidden>デモモードです。予定はこのブラウザにだけ保存され、他の人とは共有されません。共有するには README の手順で Firebase の設定を入れてください。</p>
 
   <nav class="bar">
@@ -431,7 +460,7 @@ function subscribe(){
     if (S.dragId) S.pendingRender=true; else render();
   }, err=>{
     S.winKey="";
-    if (err.code==="permission-denied") setStatus("このアカウントには閲覧権限がありません。管理者に追加を依頼してください。", true);
+    if (err.code==="permission-denied"){ setStatus("閲覧権限がありません", true); showPerm(); }
     else setStatus("接続が切れました。ページを再読み込みしてください。", true);
   });
 }
@@ -502,7 +531,7 @@ function periodLabel(){
   if (S.view==="all") return `${md(winStart())}〜${md(winEnd())}`;
   const s=monday(S.anchor), e=addDays(s,6);
   const wi=Math.round((s-winStart())/(7*864e5));
-  return `${REL[wi]||""}　${md(s)}〜${md(e)}`;
+  return `${REL[wi]||""} ${md(s)}〜${s.getMonth()===e.getMonth()?e.getDate():md(e)}`;
 }
 function dayClass(d){ const s=ymd(d), w=d.getDay(); return [w===0?"sun":"", w===6?"sat":"", holidayName(s)?"hol":"", s===todayStr()?"today":"", s<todayStr()?"past":""].filter(Boolean).join(" "); }
 
@@ -669,6 +698,11 @@ function setStatus(msg, warn){
   if (msg){ el.textContent=msg; el.classList.toggle("warn",!!warn); return; }
   el.classList.remove("warn");
   el.textContent = S.demo ? "デモモード" : S.canWrite ? "同時編集オン・変更は自動で共有" : "閲覧のみ";
+}
+function showPerm(){
+  $("myUid").textContent=S.me||"（不明）"; $("permNote").hidden=false;
+  $("copyUid").onclick=async()=>{ try{ await navigator.clipboard.writeText(S.me); toast("UIDをコピーしました"); }
+    catch{ const r=document.createRange(); r.selectNodeContents($("myUid")); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("UIDを選択しました。長押しでコピーしてください"); } };
 }
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); setTimeout(()=>t.remove(),1800); }
 function failed(err){
