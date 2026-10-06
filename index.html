@@ -110,6 +110,25 @@ button,input,textarea,select{font:inherit;color:inherit}
 .cats label:has(input:checked){border-color:var(--tc,var(--fg));background:color-mix(in srgb,var(--tc,var(--fg)) 14%,transparent);color:var(--tc,var(--fg));font-weight:700}
 .cats label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
 .cats .none{--tc:var(--muted)}
+.cats .tm{--tc:var(--fg)}
+.wheels{display:flex;align-items:flex-end;gap:10px;margin-top:6px;flex-wrap:wrap}
+.wcol{display:grid;gap:4px}
+.wlab{font-size:12px;color:var(--muted)}
+.wsep{padding-bottom:78px;color:var(--muted)}
+.wmsg{margin:4px 0 0;font-size:12px;color:var(--sun)}
+.wheel-box{display:block}
+.wheel{position:relative;height:180px;width:112px;overflow-y:scroll;scroll-snap-type:y mandatory;border:1px solid var(--line);border-radius:10px;background:var(--bg);scrollbar-width:none;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.wheel::-webkit-scrollbar{display:none}
+.wheel .pad{height:72px}
+.wheel .opt{height:36px;line-height:36px;text-align:center;scroll-snap-align:center;font-family:var(--f-num);font-size:18px;color:var(--muted);cursor:pointer;font-variant-numeric:tabular-nums}
+.wheel .opt.sel{color:var(--fg);font-weight:700;font-size:21px}
+.wheel-box{position:relative}
+.wheel-box::before{content:"";position:absolute;left:0;right:0;top:50%;height:36px;margin-top:-18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);pointer-events:none;z-index:1}
+.wheel-hint{font-size:12px;color:var(--muted)}
+.wheel:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.time{font-family:var(--f-num);font-size:12px;font-weight:500;color:var(--fg);margin-right:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.half .li .time{font-size:10px;margin-right:3px;color:var(--muted)}
 .item .m{font-size:12px;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .item .mv{display:flex;flex-direction:column;gap:1px}
 .item .mv button{border:0;background:transparent;color:var(--muted);font-size:10px;line-height:1;padding:2px 4px;cursor:pointer;border-radius:4px}
@@ -270,6 +289,20 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
         <label class="cat-visitor"><input type="radio" name="cat" value="visitor" id="cat5">来客</label>
       </div>
     </div>
+    <div class="field"><span class="lb">時間</span>
+      <div class="cats" id="fTimes" role="radiogroup" aria-label="時間">
+        <label class="none"><input type="radio" name="tmode" value="" id="tm0" checked>なし</label>
+        <label class="tm"><input type="radio" name="tmode" value="AM" id="tm1">AM</label>
+        <label class="tm"><input type="radio" name="tmode" value="PM" id="tm2">PM</label>
+        <label class="tm"><input type="radio" name="tmode" value="T" id="tm3">時刻</label>
+      </div>
+      <div class="wheels" id="wheelBox" hidden>
+        <div class="wcol"><span class="wlab">開始</span><div class="wheel-box"><div class="wheel" id="wheel" tabindex="0" role="listbox" aria-label="開始時刻（30分刻み）"></div></div></div>
+        <span class="wsep">〜</span>
+        <div class="wcol"><span class="wlab">終了（任意）</span><div class="wheel-box"><div class="wheel" id="wheelEnd" tabindex="0" role="listbox" aria-label="終了時刻（30分刻み・任意）"></div></div></div>
+      </div>
+      <p class="wmsg" id="endMsg" hidden></p>
+    </div>
     <div class="field"><label for="fTitle">内容</label><input id="fTitle" required maxlength="120" placeholder="例: 大阪支店 打ち合わせ"></div>
     <div class="field"><label for="fMemo">メモ</label><textarea id="fMemo" maxlength="1000" placeholder="場所、担当、持ち物など"></textarea></div>
     <p class="meta" id="fMeta" hidden></p>
@@ -322,6 +355,10 @@ const REGIONS = [{k:"west",n:"西日本"},{k:"east",n:"東日本"}];
 const CATS = {car:"車両関係", leave:"休暇", meeting:"MT", out:"外出", visitor:"来客"};   // 入力画面の名前
 const CAT_LABEL = {car:"車両関係", leave:"休暇", meeting:"MT", out:"外出", visitor:"客"};  // 週表示の札
 const CAT_SHORT = {car:"車", leave:"休", meeting:"MT", out:"外", visitor:"客"};          // 5週間表示の札
+// 時間: "" | "AM" | "PM" | "HH:MM"（30分刻み）
+const TIMES = Array.from({length:48},(_,i)=>`${String(Math.floor(i/2)).padStart(2,"0")}:${i%2?"30":"00"}`);
+const timeLabel = t => !t ? "" : (t==="AM"||t==="PM") ? t : t.replace(/^0/,"");
+const validTime = t => t==="AM"||t==="PM"||TIMES.includes(t);
 const WD = ["月","火","水","木","金","土","日"];
 // 日本の祝日を年ごとに計算（祝日法に基づく。春分・秋分は 1980〜2099 年の近似式）
 const holCache = {};
@@ -489,10 +526,19 @@ setInterval(checkRollover, 5*60*1000);
 document.addEventListener("visibilitychange",()=>{ if (document.visibilityState==="visible") checkRollover(); });
 
 // ---------- helpers ----------
+// 並び順: 時間なし → AM → 時刻（早い順。PM は 12:00 の直前）→ 同じ時間どうしは手動の順番
+function rank(e){
+  const t=e&&e.time;
+  if (!validTime(t)) return -2;
+  if (t==="AM") return -1;
+  if (t==="PM") return 719.5;
+  return +t.slice(0,2)*60 + +t.slice(3);
+}
 function listFor(date, region, exclude){
   const out=[]; for (const [id,e] of S.events) if (e.date===date && e.region===region && id!==exclude) out.push({id,...e});
-  out.sort((a,b)=>(a.order-b.order)||((a.createdAt||0)-(b.createdAt||0))); return out;
+  out.sort((a,b)=>(rank(a)-rank(b))||(a.order-b.order)||((a.createdAt||0)-(b.createdAt||0))); return out;
 }
+const groupFor = (date, region, rk, exclude) => listFor(date,region,exclude).filter(x=>rank(x)===rk);
 function orderAt(list, idx){
   if (!list.length) return 1024;
   if (idx<=0) return list[0].order-1024;
@@ -500,8 +546,10 @@ function orderAt(list, idx){
   return (list[idx-1].order+list[idx].order)/2;
 }
 const stamp = () => ({updatedAt:Date.now(), updatedBy:S.me||null, updatedByName:S.myName||""});
+// idx は「同じ時間の予定どうし」の中での位置
 async function placeAt(id, date, region, idx, extra={}){
-  const list=listFor(date,region,id), me=S.events.get(id);
+  const me=S.events.get(id), rk=rank({...me,...extra});
+  const list=groupFor(date,region,rk,id);
   const where = (me.date!==date ? {date} : {}), reg = (me.region!==region ? {region} : {});
   const tight = idx>0 && idx<list.length && (list[idx].order-list[idx-1].order)<1e-6;
   if (tight){ // 間隔が詰まったら番号を振り直す（1回の保存でまとめて）
@@ -512,6 +560,11 @@ async function placeAt(id, date, region, idx, extra={}){
     return;
   }
   await commit([{id, patch:{...extra, ...where, ...reg, order:orderAt(list,idx), ...stamp()}}]);
+}
+function timeText(e){
+  if (!validTime(e.time)) return "";
+  const end = (e.time!=="AM"&&e.time!=="PM"&&TIMES.includes(e.end)&&e.end>e.time) ? "〜"+timeLabel(e.end) : "";
+  return timeLabel(e.time)+end;
 }
 
 // ---------- rendering ----------
@@ -554,14 +607,15 @@ function renderLane(ds, region){
   const items=listFor(ds,region);
   const lane=h("div",{class:"lane"+(items.length?"":" empty"),"data-date":ds,"data-region":region});
   items.forEach((e,idx)=>{
+    const grp=items.filter(x=>rank(x)===rank(e)), gi=grp.findIndex(x=>x.id===e.id);
     const it=h("div",{class:"item",role:"button",tabindex:"0","data-id":e.id,draggable:S.canWrite?"true":null,
       onclick:ev=>{ if (ev.target.closest(".mv")) return; openDialog(e.id); },
       onkeydown:ev=>{ if (ev.key==="Enter"&&ev.target===it) openDialog(e.id); }},
       h("span",{class:"no",text:String(idx+1)}),
-      h("div",{class:"body"}, h("div",{class:"t"}, CATS[e.category]?h("span",{class:"tag cat-"+e.category,text:CAT_LABEL[e.category]}):null, e.title||"(無題)"), e.memo?h("div",{class:"m",text:e.memo}):null),
+      h("div",{class:"body"}, h("div",{class:"t"}, validTime(e.time)?h("span",{class:"time",text:timeText(e)}):null, CATS[e.category]?h("span",{class:"tag cat-"+e.category,text:CAT_LABEL[e.category]}):null, e.title||"(無題)"), e.memo?h("div",{class:"m",text:e.memo}):null),
       S.canWrite?h("div",{class:"mv"},
-        h("button",{type:"button","aria-label":"上へ",disabled:idx===0,onclick:()=>move(e.id,ds,region,idx-1),text:"▲"}),
-        h("button",{type:"button","aria-label":"下へ",disabled:idx===items.length-1,onclick:()=>move(e.id,ds,region,idx+1),text:"▼"})):h("span"));
+        h("button",{type:"button","aria-label":"上へ",disabled:gi===0,title:"同じ時間の予定の中で上へ",onclick:()=>move(e.id,ds,region,gi-1),text:"▲"}),
+        h("button",{type:"button","aria-label":"下へ",disabled:gi===grp.length-1,title:"同じ時間の予定の中で下へ",onclick:()=>move(e.id,ds,region,gi+1),text:"▼"})):h("span"));
     if (S.canWrite){
       it.addEventListener("dragstart",ev=>{ S.dragId=e.id; it.classList.add("dragging"); ev.dataTransfer.effectAllowed="move"; try{ev.dataTransfer.setData("text/plain",e.id);}catch{} });
       it.addEventListener("dragend",()=>{ S.dragId=null; clearIns(); if (S.pendingRender) render(); else it.classList.remove("dragging"); });
@@ -573,7 +627,9 @@ function renderLane(ds, region){
     lane.addEventListener("dragover",ev=>{ if(!S.dragId) return; ev.preventDefault(); showIns(lane, insIndex(lane,ev.clientY)); });
     lane.addEventListener("dragleave",ev=>{ if(!lane.contains(ev.relatedTarget)) clearIns(); });
     lane.addEventListener("drop",async ev=>{ if(!S.dragId) return; ev.preventDefault(); const id=S.dragId; const idx=insIndex(lane,ev.clientY); clearIns();
-      try{ await placeAt(id, ds, region, idx); }catch(err){ failed(err); } });
+      const me=S.events.get(id); if (!me) return;
+      const before=listFor(ds,region,id).slice(0,idx).filter(x=>rank(x)===rank(me)).length;
+      try{ await placeAt(id, ds, region, before); }catch(err){ failed(err); } });
   }
   return lane;
 }
@@ -595,7 +651,7 @@ function renderAll(){
     const halves=h("div",{class:"halves"});
     for (const r of REGIONS){
       const items=listFor(ds,r.k); const half=h("div",{class:"half "+r.k,title:r.n});
-      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li"}, `${j+1}. `, CATS[e.category]?h("span",{class:"tag mini cat-"+e.category,text:CAT_SHORT[e.category],title:CATS[e.category]}):null, e.title||"(無題)")));
+      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li"}, `${j+1}. `, validTime(e.time)?h("span",{class:"time",text:timeLabel(e.time)}):null, CATS[e.category]?h("span",{class:"tag mini cat-"+e.category,text:CAT_SHORT[e.category],title:CATS[e.category]}):null, e.title||"(無題)")));
       if (items.length>3) half.append(h("div",{class:"more",text:`ほか${items.length-3}件`}));
       if (items.length) half.append(h("div",{class:"cnt",text:String(items.length)}));
       halves.append(half);
@@ -606,13 +662,65 @@ function renderAll(){
   return box;
 }
 
+// ---------- 時刻ホイール（開始・終了） ----------
+function makeWheel(el, labels, onChange){
+  const W={idx:0, lock:0};
+  el.append(h("div",{class:"pad"}), ...labels.map((t,i)=>h("div",{class:"opt",role:"option",text:t,onclick:()=>W.to(i,true)})), h("div",{class:"pad"}));
+  const opts=[...el.querySelectorAll(".opt")];
+  W.mark=()=>opts.forEach((o,i)=>{ o.classList.toggle("sel",i===W.idx); o.setAttribute("aria-selected",i===W.idx); });
+  // プログラムで動かした直後は、ブラウザのスナップ補正で選択が変わらないようにする
+  W.to=(i,smooth)=>{ const n=Math.max(0,Math.min(labels.length-1,i)), ch=n!==W.idx; W.idx=n; W.lock=Date.now()+(smooth?500:250);
+    el.scrollTo({top:n*36+1,behavior:smooth?"smooth":"auto"}); W.mark(); if (ch&&onChange) onChange(); };
+  W.sync=()=>{ const t=W.idx; W.to(t,false); requestAnimationFrame(()=>requestAnimationFrame(()=>W.to(t,false))); };
+  el.addEventListener("scroll",()=>{ if (Date.now()<W.lock) return;
+    const i=Math.round((el.scrollTop-1)/36); if (i!==W.idx && i>=0 && i<labels.length){ W.idx=i; W.mark(); if (onChange) onChange(); } });
+  ["touchstart","wheel","pointerdown"].forEach(t=>el.addEventListener(t,()=>{ W.lock=0; },{passive:true}));
+  el.addEventListener("keydown",ev=>{ if (ev.key==="ArrowDown"){ ev.preventDefault(); W.to(W.idx+1,true); } else if (ev.key==="ArrowUp"){ ev.preventDefault(); W.to(W.idx-1,true); } });
+  return W;
+}
+const END_OPTS=["なし", ...TIMES];   // 終了: 0 = なし, i>0 = TIMES[i-1]
+const wStart=makeWheel($("wheel"), TIMES.map(t=>t.replace(/^0/,"")), ()=>{ fixEnd(); refreshOrder(); });
+const wEnd=makeWheel($("wheelEnd"), END_OPTS.map(t=>t.replace(/^0/,"")), ()=>fixEnd(true));
+function fixEnd(userMovedEnd){ // 終了は開始より後だけ
+  const msg=$("endMsg");
+  if (wEnd.idx>0 && wEnd.idx-1<=wStart.idx){
+    if (userMovedEnd){ msg.textContent="終了は開始より後にしてください"; msg.hidden=false; }
+    else { wEnd.to(0,true); }
+  } else msg.hidden=true;
+}
+function showWheel(on){ $("wheelBox").hidden=!on; if (on){ wStart.sync(); wEnd.sync(); } }
+function setTimeUI(t, end){
+  const mode = !t ? "" : (t==="AM"||t==="PM") ? t : "T";
+  for (const r of dlg.querySelectorAll('input[name="tmode"]')) r.checked=(r.value===mode);
+  wStart.idx = mode==="T" ? TIMES.indexOf(t) : 18;   // 既定 9:00
+  wEnd.idx = (mode==="T" && TIMES.includes(end) && end>t) ? TIMES.indexOf(end)+1 : 0;
+  wStart.mark(); wEnd.mark(); $("endMsg").hidden=true;
+  showWheel(mode==="T");
+}
+function getTimeUI(){
+  const m=(dlg.querySelector('input[name="tmode"]:checked')||{}).value||"";
+  if (m!=="T") return {time:m, end:""};
+  const end = wEnd.idx>0 && wEnd.idx-1>wStart.idx ? TIMES[wEnd.idx-1] : "";
+  return {time:TIMES[wStart.idx], end};
+}
+for (const r of document.querySelectorAll('input[name="tmode"]')) r.addEventListener("change",()=>{ showWheel(r.value==="T"&&r.checked); refreshOrder(); });
+
 // ---------- dialog ----------
 const dlg=$("dlg"); let cur=null;
 const regionVal = () => $("fEast").checked ? "east" : "west";
-function fillOrderSelect(date, region, id, selIdx){
-  const list=listFor(date,region,id); const sel=$("fOrder"); sel.replaceChildren();
+function fillOrderSelect(date, region, id, rk, selIdx){
+  const list=groupFor(date,region,rk,id); const sel=$("fOrder"); sel.replaceChildren();
+  if (!list.length){ sel.append(h("option",{value:"0",text:"時間順で自動"})); sel.value="0"; sel.disabled=true; return; }
+  sel.disabled=!S.canWrite;
   for (let i=0;i<=list.length;i++) sel.append(h("option",{value:String(i),text: i===list.length?`${i+1}番目（最後）`:`${i+1}番目（${list[i].title||"無題"} の前）`}));
   sel.value=String(Math.min(selIdx??list.length, list.length));
+}
+// 日付・地域・時間が変わったら「順番」の選択肢を作り直す（同じ時間の予定どうしの中での順番）
+function refreshOrder(){
+  if (!cur || !$("fDate").value) return;
+  const t=getTimeUI(), rk=rank({time:t.time}), date=$("fDate").value, region=regionVal();
+  const b=cur.base, same = b && b.date===date && b.region===region && rank(b)===rk;
+  fillOrderSelect(date, region, cur.id, rk, same ? groupFor(b.date,b.region,rk).findIndex(x=>x.id===cur.id) : null);
 }
 function openDialog(id, date, region){
   const e = id ? S.events.get(id) : null; if (id && !e) return;
@@ -623,23 +731,20 @@ function openDialog(id, date, region){
   ((e?e.region:region)==="east" ? $("fEast") : $("fWest")).checked=true;
   $("fTitle").value = e?(e.title||""):""; $("fMemo").value = e?(e.memo||""):"";
   const cv=e&&CATS[e.category]?e.category:""; for (const r of dlg.querySelectorAll('input[name="cat"]')) r.checked=(r.value===cv);
-  fillOrderSelect($("fDate").value, regionVal(), id, id ? listFor(e.date,e.region).findIndex(x=>x.id===id) : null);
+  setTimeUI(e&&validTime(e.time)?e.time:"", e?e.end:"");
   $("delBtn").hidden = !id || !S.canWrite; disarm();
   $("conflict").hidden=true; $("saveBtn").disabled=false;
   $("fMeta").hidden=!(e&&e.updatedAt);
   if (e&&e.updatedAt){ const t=new Date(e.updatedAt); $("fMeta").textContent=`最終更新 ${t.getMonth()+1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}${e.updatedByName?"・"+e.updatedByName:""}`; }
   for (const el of dlg.querySelectorAll("input,textarea,select")) el.disabled=!S.canWrite;
+  refreshOrder();
   $("saveBtn").hidden=!S.canWrite;
   dlg.showModal(); if (S.canWrite) $("fTitle").focus();
 }
 function closeDialog(){ if (dlg.open) dlg.close(); }
 dlg.addEventListener("close",()=>{ cur=null; });
 $("cancelBtn").onclick=closeDialog;
-for (const el of [$("fDate"),$("fWest"),$("fEast")]) el.addEventListener("change",()=>{
-  if (!$("fDate").value||!cur) return;
-  const same = cur.base && cur.base.date===$("fDate").value && cur.base.region===regionVal();
-  fillOrderSelect($("fDate").value, regionVal(), cur.id, same ? listFor(cur.base.date,cur.base.region).findIndex(x=>x.id===cur.id) : null);
-});
+for (const el of [$("fDate"),$("fWest"),$("fEast")]) el.addEventListener("change",refreshOrder);
 function checkConflict(){
   if (!cur || !cur.id || !dlg.open) return;
   const now=S.events.get(cur.id);
@@ -654,20 +759,24 @@ $("form").addEventListener("submit", async ev=>{
   ev.preventDefault(); if (!S.canWrite) return;
   const title=$("fTitle").value.trim(); if (!title){ $("fTitle").focus(); return; }
   const category=(dlg.querySelector('input[name="cat"]:checked')||{}).value||"";
+  const {time,end}=getTimeUI();
+  if (!$("endMsg").hidden){ toast("終了は開始より後にしてください"); return; }
   const date=$("fDate").value, region=regionVal(), idx=Number($("fOrder").value), memo=$("fMemo").value.trim();
   if (!inWindow(date)){ toast(`日付は ${md(winStart())}〜${md(winEnd())} の間で選んでください`); $("fDate").focus(); return; }
   $("saveBtn").disabled=true;
   try{
     if (!cur.id){
-      await store.add({date,region,category,title,memo,order:orderAt(listFor(date,region),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
+      await store.add({date,region,category,time,end,title,memo,order:orderAt(groupFor(date,region,rank({time})),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
       toast("追加しました");
     } else {
       const b=cur.base, patch={};
       if (title!==(b.title||"")) patch.title=title;
       if (memo!==(b.memo||"")) patch.memo=memo;
       if (category!==(b.category||"")) patch.category=category;
-      const oldIdx=listFor(b.date,b.region).findIndex(x=>x.id===cur.id);
-      const moved = date!==b.date || region!==b.region || idx!==oldIdx;
+      if (time!==(b.time||"")) patch.time=time;
+      if (end!==(b.end||"")) patch.end=end;
+      const oldIdx=groupFor(b.date,b.region,rank(b)).findIndex(x=>x.id===cur.id);
+      const moved = date!==b.date || region!==b.region || rank({time})!==rank(b) || idx!==oldIdx;
       if (moved) await placeAt(cur.id,date,region,idx,patch);
       else if (Object.keys(patch).length) await store.update(cur.id,{...patch,...stamp()});
       toast("保存しました");
