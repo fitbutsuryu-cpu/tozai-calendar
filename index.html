@@ -100,6 +100,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .lane[data-region="east"] .no{background:var(--east)}
 .item .body{min-width:0}
 .item .t{font-weight:500;overflow-wrap:anywhere}
+.who{display:inline-block;font-size:11px;font-weight:500;color:var(--muted);border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+.half .li .who{border:0;background:none;padding:0;margin-left:3px;font-size:10px}
 .tag{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:3px 6px;border-radius:4px;margin-right:6px;vertical-align:1px;color:var(--tc);background:color-mix(in srgb,var(--tc) 14%,transparent);border:1px solid color-mix(in srgb,var(--tc) 40%,transparent)}
 .tag.mini{font-size:9px;padding:1px 3px;margin-right:3px;vertical-align:1px}
 .cat-car{--tc:var(--c-car)} .cat-leave{--tc:var(--c-leave)} .cat-meeting{--tc:var(--c-meeting)} .cat-out{--tc:var(--c-out)} .cat-visitor{--tc:var(--c-visitor)}
@@ -305,6 +307,7 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
       </div>
       <p class="wmsg" id="endMsg" hidden></p>
     </div>
+    <div class="field"><label for="fAssignee">担当（任意）</label><select id="fAssignee"></select></div>
     <div class="field"><label for="fTitle">内容</label><input id="fTitle" required maxlength="120" placeholder="例: 大阪支店 打ち合わせ"></div>
     <div class="field"><label for="fMemo">メモ</label><textarea id="fMemo" maxlength="1000" placeholder="場所、担当、持ち物など"></textarea></div>
     <p class="meta" id="fMeta" hidden></p>
@@ -421,7 +424,7 @@ function clampAnchor(){
 const S = {
   view:"week", anchor:new Date(), events:new Map(),
   me:null, myName:"", canWrite:true, demo:!firebaseConfig.apiKey,
-  serverEvents:new Map(), pending:new Map(),
+  serverEvents:new Map(), pending:new Map(), members:{},
   dragId:null, pendingRender:false, unsub:null, winKey:"", flashDate:null
 };
 try { const v=localStorage.getItem("tozai.view"); if (v==="all"||v==="week") S.view=v; } catch {}
@@ -517,7 +520,7 @@ function subscribe(){
   S.unsub=F.onSnapshot(q, snap=>{
     const m=new Map();
     snap.forEach(d=>{ const evs=(d.data()||{}).events||{}; for (const [id,e] of Object.entries(evs)) if (e && e.date) m.set(id,e); });
-    if (!$("permNote").hidden || permTimer){ $("permNote").hidden=true; clearTimeout(permTimer); permTimer=null; permTries=0; S.canWrite=true; cleanupOld(); }
+    if (!$("permNote").hidden || permTimer){ $("permNote").hidden=true; clearTimeout(permTimer); permTimer=null; permTries=0; S.canWrite=true; cleanupOld(); watchMembers(); }
     S.serverEvents=m; S.events=applyPending(m); setStatus(); checkConflict();
     if (S.dragId) S.pendingRender=true; else render();
   }, err=>{
@@ -529,6 +532,22 @@ function subscribe(){
       if (Date.now()-permSince < 2*3600*1000) permTimer=setTimeout(()=>{ permTimer=null; subscribe(); }, waitMin*60000); }
     else setStatus("接続が切れました。ページを再読み込みしてください。", true);
   });
+}
+
+// メンバー名簿: meta/members の names に {UID: 表示名}。各自が自分の名前だけを書き込む
+let unsubMembers=null;
+function watchMembers(){
+  if (S.demo || !F || unsubMembers) return;
+  unsubMembers=F.onSnapshot(F.doc(F.db,"meta","members"), snap=>{
+    S.members={...((snap.exists() && (snap.data()||{}).names) || {})};
+    if (S.me && S.myName && S.members[S.me]!==S.myName) saveMyName();
+    if (S.dragId) S.pendingRender=true; else render();
+    if (dlg.open && cur) { const v=$("fAssignee").value; fillAssignee(v, cur.base&&cur.base.assigneeName); }
+  }, ()=>{ unsubMembers=null; });
+}
+async function saveMyName(){
+  if (S.demo || !F || !S.me || !S.myName) return;
+  try{ await F.setDoc(F.doc(F.db,"meta","members"), {names:{[S.me]:S.myName}}, {merge:true}); }catch(e){ console.warn("members", e); }
 }
 
 // 先週より前の週のデータを削除（各端末で1日1回まで。誰か1人が開けば消える）
@@ -591,6 +610,8 @@ async function placeAt(id, date, region, idx, extra={}){
   }
   await commit([{id, patch:{...extra, ...where, ...reg, order:orderAt(list,idx), ...stamp()}}]);
 }
+// 担当者の名前（名簿の今の名前を優先し、名簿にいなければ保存時の名前）
+const assigneeName = e => !e.assignee ? "" : (S.members[e.assignee] || e.assigneeName || "（不明）");
 function timeText(e){
   if (!validTime(e.time)) return "";
   const end = (TIMES.includes(e.time)&&TIMES.includes(e.end)&&e.end>e.time) ? "〜"+timeLabel(e.end) : "";
@@ -642,7 +663,7 @@ function renderLane(ds, region){
       onclick:ev=>{ if (ev.target.closest(".mv")) return; openDialog(e.id); },
       onkeydown:ev=>{ if (ev.key==="Enter"&&ev.target===it) openDialog(e.id); }},
       h("span",{class:"no",text:String(idx+1)}),
-      h("div",{class:"body"}, h("div",{class:"t"}, validTime(e.time)?h("span",{class:"time",text:timeText(e)}):null, CATS[e.category]?h("span",{class:"tag cat-"+e.category,text:CAT_LABEL[e.category]}):null, e.title||"(無題)"), e.memo?h("div",{class:"m",text:e.memo}):null),
+      h("div",{class:"body"}, h("div",{class:"t"}, validTime(e.time)?h("span",{class:"time",text:timeText(e)}):null, CATS[e.category]?h("span",{class:"tag cat-"+e.category,text:CAT_LABEL[e.category]}):null, e.title||"(無題)", e.assignee?h("span",{class:"who",text:"担当 "+assigneeName(e)}):null), e.memo?h("div",{class:"m",text:e.memo}):null),
       S.canWrite?h("div",{class:"mv"},
         h("button",{type:"button","aria-label":"上へ",disabled:gi===0,title:"同じ時間の予定の中で上へ",onclick:()=>move(e.id,ds,region,gi-1),text:"▲"}),
         h("button",{type:"button","aria-label":"下へ",disabled:gi===grp.length-1,title:"同じ時間の予定の中で下へ",onclick:()=>move(e.id,ds,region,gi+1),text:"▼"})):h("span"));
@@ -681,7 +702,7 @@ function renderAll(){
     const halves=h("div",{class:"halves"});
     for (const r of REGIONS){
       const items=listFor(ds,r.k); const half=h("div",{class:"half "+r.k,title:r.n});
-      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li"}, `${j+1}. `, validTime(e.time)?h("span",{class:"time",text:timeLabel(e.time)}):null, CATS[e.category]?h("span",{class:"tag mini cat-"+e.category,text:CAT_SHORT[e.category],title:CATS[e.category]}):null, e.title||"(無題)")));
+      items.slice(0,3).forEach((e,j)=>half.append(h("div",{class:"li"}, `${j+1}. `, validTime(e.time)?h("span",{class:"time",text:timeLabel(e.time)}):null, CATS[e.category]?h("span",{class:"tag mini cat-"+e.category,text:CAT_SHORT[e.category],title:CATS[e.category]}):null, e.title||"(無題)", e.assignee?h("span",{class:"who",text:"・"+assigneeName(e)}):null)));
       if (items.length>3) half.append(h("div",{class:"more",text:`ほか${items.length-3}件`}));
       if (items.length) half.append(h("div",{class:"cnt",text:String(items.length)}));
       halves.append(half);
@@ -762,6 +783,7 @@ function openDialog(id, date, region){
   $("fTitle").value = e?(e.title||""):""; $("fMemo").value = e?(e.memo||""):"";
   const cv=e&&CATS[e.category]?e.category:""; for (const r of dlg.querySelectorAll('input[name="cat"]')) r.checked=(r.value===cv);
   setTimeUI(e&&validTime(e.time)?e.time:"", e?e.end:"");
+  fillAssignee(e?e.assignee:"", e?e.assigneeName:"");
   $("delBtn").hidden = !id || !S.canWrite; disarm();
   $("conflict").hidden=true; $("saveBtn").disabled=false;
   $("fMeta").hidden=!(e&&e.updatedAt);
@@ -770,6 +792,13 @@ function openDialog(id, date, region){
   refreshOrder();
   $("saveBtn").hidden=!S.canWrite;
   dlg.showModal(); if (S.canWrite) $("fTitle").focus();
+}
+function fillAssignee(cur, curName){
+  const sel=$("fAssignee"); sel.replaceChildren(h("option",{value:"",text:"（なし）"}));
+  const list=Object.entries(S.members).filter(([,n])=>n).sort((a,b)=>a[1].localeCompare(b[1],"ja"));
+  if (cur && !S.members[cur]) list.push([cur, curName||"（不明）"]);   // 名簿から外れた人が担当のままの予定
+  for (const [uid,name] of list) sel.append(h("option",{value:uid,text:uid===S.me?`${name}（自分）`:name}));
+  sel.value=cur||"";
 }
 function closeDialog(){ if (dlg.open) dlg.close(); }
 dlg.addEventListener("close",()=>{ cur=null; });
@@ -790,13 +819,14 @@ $("form").addEventListener("submit", async ev=>{
   const title=$("fTitle").value.trim(); if (!title){ $("fTitle").focus(); return; }
   const category=(dlg.querySelector('input[name="cat"]:checked')||{}).value||"";
   const {time,end}=getTimeUI();
+  const assignee=$("fAssignee").value, assigneeNm=assignee ? (S.members[assignee] || (cur.base&&cur.base.assigneeName) || "") : "";
   if (!$("endMsg").hidden){ toast("終了は開始より後にしてください"); return; }
   const date=$("fDate").value, region=regionVal(), idx=Number($("fOrder").value), memo=$("fMemo").value.trim();
   if (!inWindow(date)){ toast(`日付は ${md(winStart())}〜${md(winEnd())} の間で選んでください`); $("fDate").focus(); return; }
   $("saveBtn").disabled=true;
   try{
     if (!cur.id){
-      await store.add({date,region,category,time,end,title,memo,order:orderAt(groupFor(date,region,rank({time})),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
+      await store.add({date,region,category,time,end,assignee,assigneeName:assigneeNm,title,memo,order:orderAt(groupFor(date,region,rank({time})),idx),createdAt:Date.now(),createdBy:S.me||null,...stamp()});
       toast("追加しました");
     } else {
       const b=cur.base, patch={};
@@ -805,6 +835,7 @@ $("form").addEventListener("submit", async ev=>{
       if (category!==(b.category||"")) patch.category=category;
       if (time!==(b.time||"")) patch.time=time;
       if (end!==(b.end||"")) patch.end=end;
+      if (assignee!==(b.assignee||"") || (assignee && assigneeNm!==(b.assigneeName||""))){ patch.assignee=assignee; patch.assigneeName=assigneeNm; }
       const oldIdx=groupFor(b.date,b.region,rank(b)).findIndex(x=>x.id===cur.id);
       const moved = date!==b.date || region!==b.region || rank({time})!==rank(b) || idx!==oldIdx;
       if (moved) await placeAt(cur.id,date,region,idx,patch);
@@ -856,6 +887,7 @@ function failed(err){
 // ---------- 起動 ----------
 render();
 if (S.demo){
+  S.me="demo"; S.myName="デモ"; S.members={demo:"デモ", d2:"田中（大阪）", d3:"佐藤（東京）"};
   demoLoad(); pruneLocal(); demoSave(); $("demoNote").hidden=false; setStatus(); render();
 } else {
   setStatus("読み込み中…");
@@ -896,11 +928,11 @@ if (S.demo){
     $("nameForm").addEventListener("submit", async ev=>{
       ev.preventDefault(); const nm=$("nName").value.trim(); if (!nm) return;
       try{ await auth.updateProfile(a.currentUser,{displayName:nm}); }catch(e){ gateMsg("nameErr","保存できませんでした。もう一度お試しください。"); return; }
-      S.myName=nm; $("nameBtn").textContent=nm; $("gate").hidden=true; start();
+      S.myName=nm; $("nameBtn").textContent=nm; $("gate").hidden=true; start(); saveMyName();
     });
     $("logoutBtn").onclick=async ()=>{ await auth.signOut(a); location.reload(); };
     let started=false;
-    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); render(); cleanupOld(); };
+    const start=()=>{ if (started) return; started=true; setStatus(); subscribe(); watchMembers(); render(); cleanupOld(); };
     auth.onAuthStateChanged(a, u=>{
       if (!u){ $("gate").hidden=false; $("loginForm").hidden=false; $("nameForm").hidden=true; $("logoutBtn").hidden=true; $("nameBtn").hidden=true; return; }
       S.me=u.uid; S.myName=u.displayName||"";
