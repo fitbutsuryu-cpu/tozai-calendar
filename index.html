@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="東西カレンダー">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=M+PLUS+1:wght@700;800&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 /* Layout: 1行=1日、左に西日本・右に東日本のレーン。月表示は各マスを左右2分割。 */
 :root{
@@ -21,9 +21,8 @@
   --west:#2e7a68; --west-soft:#e2f0ec; --east:#34508f; --east-soft:#e4e9f5;
   --sun:#b8433a; --sat:#3f63a8; --today:#fff6d9; --focus:#c08a1e;
   --c-car:#a8650f; --c-leave:#c0396b; --c-meeting:#6a4cc0; --c-out:#557a12; --c-visitor:#0f7c86;
-  /* 端末に入っている見やすいゴシック体: Windows=メイリオ / iPhone・Mac=ヒラギノ / Android=Noto Sans */
-  --f-display:"Meiryo","メイリオ","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP",system-ui,sans-serif;
-  --f-body:"Meiryo","メイリオ","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP",system-ui,sans-serif;
+  --f-display:"M PLUS 1","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   --r:8px;
 }
@@ -49,7 +48,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 
 /* header */
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
-.brand{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.02em;margin:0;display:flex;align-items:center;gap:8px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.02em;margin:0;display:flex;align-items:center;gap:8px}
 .brand .mark{display:inline-flex;border-radius:4px;overflow:hidden;font-family:var(--f-body);font-size:11px;font-weight:700}
 .brand .mark span{padding:2px 5px;color:#fff}
 .brand .mark .w{background:var(--west)} .brand .mark .e{background:var(--east)}
@@ -172,7 +171,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);padding:0;width:min(460px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(10,14,12,.45)}
 .dlg{display:grid;gap:14px;padding:18px}
-.dlg h2{font-family:var(--f-display);font-weight:700;font-size:18px;margin:0}
+.dlg h2{font-family:var(--f-display);font-weight:800;font-size:18px;margin:0}
 .field{display:grid;gap:5px}
 .field label,.field .lb{font-size:12px;color:var(--muted);letter-spacing:.04em}
 .field input,.field textarea,.field select{border:1px solid var(--line);background:var(--bg);border-radius:var(--r);padding:8px 10px;width:100%}
@@ -193,7 +192,7 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
 
 .gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;padding:16px;z-index:30}
 .gate .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;max-width:380px;width:100%;display:grid;gap:14px;text-align:center}
-.gate h2{font-family:var(--f-display);font-weight:700;margin:0;font-size:22px}
+.gate h2{font-family:var(--f-display);font-weight:800;margin:0;font-size:22px}
 .gate p{margin:0;color:var(--muted);font-size:13px}
 .gate .err{color:var(--sun)}
 .gate .field{text-align:left}
