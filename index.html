@@ -244,9 +244,10 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
     <button class="btn" id="logoutBtn" hidden>ログアウト</button>
   </header>
   <div class="notice perm" id="permNote" hidden>
-    <span>このアカウントは、まだカレンダーの利用者に登録されていません。下のUIDを管理者に伝え、Firebase のルール（firestore.rules）の一覧に追加してもらってください。ルールが最新版になっていない場合にも表示されます。</span>
+    <span>このアカウントは、まだカレンダーの利用者に登録されていません。下のUIDを管理者に伝え、Firebase のルール（firestore.rules）の一覧に追加してもらってください。ルールが最新版になっていない場合にも表示されます。追加されると数分以内に自動で表示されます（「もう一度読み込む」ですぐ確認できます）。</span>
     <code id="myUid"></code>
     <button type="button" class="btn" id="copyUid">UIDをコピー</button>
+    <button type="button" class="btn" id="retryPerm">もう一度読み込む</button>
   </div>
   <p class="notice" id="demoNote" hidden>デモモードです。予定はこのブラウザにだけ保存され、他の人とは共有されません。共有するには README の手順で Firebase の設定を入れてください。</p>
 
@@ -292,6 +293,7 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
     <div class="field"><span class="lb">時間</span>
       <div class="cats" id="fTimes" role="radiogroup" aria-label="時間">
         <label class="none"><input type="radio" name="tmode" value="" id="tm0" checked>なし</label>
+        <label class="tm"><input type="radio" name="tmode" value="ALL" id="tm4">終日</label>
         <label class="tm"><input type="radio" name="tmode" value="AM" id="tm1">AM</label>
         <label class="tm"><input type="radio" name="tmode" value="PM" id="tm2">PM</label>
         <label class="tm"><input type="radio" name="tmode" value="T" id="tm3">時刻</label>
@@ -357,8 +359,8 @@ const CAT_LABEL = {car:"車両関係", leave:"休暇", meeting:"MT", out:"外出
 const CAT_SHORT = {car:"車", leave:"休", meeting:"MT", out:"外", visitor:"客"};          // 5週間表示の札
 // 時間: "" | "AM" | "PM" | "HH:MM"（30分刻み）
 const TIMES = Array.from({length:48},(_,i)=>`${String(Math.floor(i/2)).padStart(2,"0")}:${i%2?"30":"00"}`);
-const timeLabel = t => !t ? "" : (t==="AM"||t==="PM") ? t : t.replace(/^0/,"");
-const validTime = t => t==="AM"||t==="PM"||TIMES.includes(t);
+const timeLabel = t => !t ? "" : t==="ALL" ? "終日" : (t==="AM"||t==="PM") ? t : t.replace(/^0/,"");
+const validTime = t => t==="ALL"||t==="AM"||t==="PM"||TIMES.includes(t);
 const WD = ["月","火","水","木","金","土","日"];
 // 日本の祝日を年ごとに計算（祝日法に基づく。春分・秋分は 1980〜2099 年の近似式）
 const holCache = {};
@@ -419,6 +421,7 @@ function clampAnchor(){
 const S = {
   view:"week", anchor:new Date(), events:new Map(),
   me:null, myName:"", canWrite:true, demo:!firebaseConfig.apiKey,
+  serverEvents:new Map(), pending:new Map(),
   dragId:null, pendingRender:false, unsub:null, winKey:"", flashDate:null
 };
 try { const v=localStorage.getItem("tozai.view"); if (v==="all"||v==="week") S.view=v; } catch {}
@@ -448,7 +451,9 @@ async function commit(changes){
     }
     pruneLocal(); demoSave(); render(); return;
   }
+  let results;
   await F.runTransaction(F.db, async tx=>{
+    results=new Map();   // 保存後の各予定（null は削除）。再試行に備えて毎回作り直す
     // 1) 関係する週をすべて読む（トランザクションでは読み込みを先に済ませる）
     const need=new Set();
     for (const c of changes){
@@ -463,17 +468,35 @@ async function commit(changes){
     // 2) サーバーの最新版に変更を重ねて書く
     const upd={}, sets={};
     for (const c of changes){
-      if (c.create){ (sets[weekIdOf(c.create.date)] ||= {})[c.id]={...c.create}; continue; }
+      if (c.create){ (sets[weekIdOf(c.create.date)] ||= {})[c.id]={...c.create}; results.set(c.id,{...c.create}); continue; }
       const [w, ev]=findOnServer(c.id);
-      if (c.del){ if (w) (upd[w] ||= {})["events."+c.id]=F.deleteField(); continue; }
+      if (c.del){ if (w) (upd[w] ||= {})["events."+c.id]=F.deleteField(); results.set(c.id,null); continue; }
       if (!w) throw new Gone();                     // ほかの人が先に削除していた
       const next={...ev, ...c.patch}, nw=weekIdOf(next.date);
+      results.set(c.id, next);
       if (nw===w){ for (const [k,v] of Object.entries(c.patch)) (upd[w] ||= {})[`events.${c.id}.${k}`]=v; }
       else { (upd[w] ||= {})["events."+c.id]=F.deleteField(); (sets[nw] ||= {})[c.id]=next; }
     }
     for (const [w,p] of Object.entries(upd)) tx.update(F.doc(F.db,"weeks",w), p);
     for (const [w,evs] of Object.entries(sets)) tx.set(F.doc(F.db,"weeks",w), {events:evs}, {merge:true});
   });
+  // 保存できたら、サーバーからの通知（スマホでは遅れることがある）を待たずに自分の画面へ反映する
+  const until=Date.now()+20000;
+  for (const [id,v] of results) S.pending.set(id,{v,until});
+  S.events=applyPending(S.serverEvents);
+  if (S.dragId) S.pendingRender=true; else render();
+}
+// サーバーの内容に、まだ通知が届いていない自分の保存結果を重ねる
+const sameEv=(a,b)=>{ const ka=Object.keys(a), kb=Object.keys(b); return ka.length===kb.length && ka.every(k=>a[k]===b[k]); };
+function applyPending(server){
+  const m=new Map(server), now=Date.now();
+  for (const [id,p] of S.pending){
+    const sv=server.get(id);
+    const arrived = p.v===null ? !sv : (sv && (sameEv(sv,p.v) || (sv.updatedAt||0)>(p.v.updatedAt||0)));
+    if (arrived || now>p.until){ S.pending.delete(id); continue; }
+    if (p.v===null) m.delete(id); else m.set(id,p.v);
+  }
+  return m;
 }
 const store = {
   add: data => commit([{id:newId(), create:data}]),
@@ -484,6 +507,7 @@ function pruneLocal(){ // デモ用：期間より前の予定を消す
   const lo=ymd(winStart()); for (const [id,e] of S.events) if (e.date<lo) S.events.delete(id);
 }
 
+let permTimer=null, permTries=0, permSince=Date.now();   // 権限エラーのとき、間隔をあけて読み込み直す（ルールを直した後に開き直さなくて済むように）
 function subscribe(){
   if (S.demo || !F) return;
   const ids=winWeekIds(), key=ids[0];
@@ -493,11 +517,16 @@ function subscribe(){
   S.unsub=F.onSnapshot(q, snap=>{
     const m=new Map();
     snap.forEach(d=>{ const evs=(d.data()||{}).events||{}; for (const [id,e] of Object.entries(evs)) if (e && e.date) m.set(id,e); });
-    S.events=m; setStatus(); checkConflict();
+    if (!$("permNote").hidden || permTimer){ $("permNote").hidden=true; clearTimeout(permTimer); permTimer=null; permTries=0; S.canWrite=true; cleanupOld(); }
+    S.serverEvents=m; S.events=applyPending(m); setStatus(); checkConflict();
     if (S.dragId) S.pendingRender=true; else render();
   }, err=>{
     S.winKey="";
-    if (err.code==="permission-denied"){ setStatus("閲覧権限がありません", true); showPerm(); }
+    if (err.code==="permission-denied"){ setStatus("閲覧権限がありません", true); showPerm();
+      // 1分→2分→4分→8分→15分おきに読み込み直し、2時間たったらやめる（ボタンでいつでも再確認できる）
+      clearTimeout(permTimer); permTries++;
+      const waitMin=Math.min(15, 2**(permTries-1));
+      if (Date.now()-permSince < 2*3600*1000) permTimer=setTimeout(()=>{ permTimer=null; subscribe(); }, waitMin*60000); }
     else setStatus("接続が切れました。ページを再読み込みしてください。", true);
   });
 }
@@ -526,9 +555,10 @@ setInterval(checkRollover, 5*60*1000);
 document.addEventListener("visibilitychange",()=>{ if (document.visibilityState==="visible") checkRollover(); });
 
 // ---------- helpers ----------
-// 並び順: 時間なし → AM → 時刻（早い順。PM は 12:00 の直前）→ 同じ時間どうしは手動の順番
+// 並び順: 終日 → 時間なし → AM → 時刻（早い順。PM は 12:00 の直前）→ 同じ時間どうしは手動の順番
 function rank(e){
   const t=e&&e.time;
+  if (t==="ALL") return -3;
   if (!validTime(t)) return -2;
   if (t==="AM") return -1;
   if (t==="PM") return 719.5;
@@ -563,7 +593,7 @@ async function placeAt(id, date, region, idx, extra={}){
 }
 function timeText(e){
   if (!validTime(e.time)) return "";
-  const end = (e.time!=="AM"&&e.time!=="PM"&&TIMES.includes(e.end)&&e.end>e.time) ? "〜"+timeLabel(e.end) : "";
+  const end = (TIMES.includes(e.time)&&TIMES.includes(e.end)&&e.end>e.time) ? "〜"+timeLabel(e.end) : "";
   return timeLabel(e.time)+end;
 }
 
@@ -690,7 +720,7 @@ function fixEnd(userMovedEnd){ // 終了は開始より後だけ
 }
 function showWheel(on){ $("wheelBox").hidden=!on; if (on){ wStart.sync(); wEnd.sync(); } }
 function setTimeUI(t, end){
-  const mode = !t ? "" : (t==="AM"||t==="PM") ? t : "T";
+  const mode = !t ? "" : (t==="AM"||t==="PM"||t==="ALL") ? t : "T";
   for (const r of dlg.querySelectorAll('input[name="tmode"]')) r.checked=(r.value===mode);
   wStart.idx = mode==="T" ? TIMES.indexOf(t) : 18;   // 既定 9:00
   wEnd.idx = (mode==="T" && TIMES.includes(end) && end>t) ? TIMES.indexOf(end)+1 : 0;
@@ -810,6 +840,7 @@ function setStatus(msg, warn){
 }
 function showPerm(){
   $("myUid").textContent=S.me||"（不明）"; $("permNote").hidden=false;
+  $("retryPerm").onclick=()=>{ clearTimeout(permTimer); permTimer=null; S.winKey=""; setStatus("読み込み中…"); subscribe(); };
   $("copyUid").onclick=async()=>{ try{ await navigator.clipboard.writeText(S.me); toast("UIDをコピーしました"); }
     catch{ const r=document.createRange(); r.selectNodeContents($("myUid")); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("UIDを選択しました。長押しでコピーしてください"); } };
 }
