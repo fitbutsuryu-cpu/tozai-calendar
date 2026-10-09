@@ -260,11 +260,11 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
     <h2 class="period" id="period"></h2>
     <div class="seg" role="group" aria-label="表示">
       <button id="vWeek" aria-pressed="true">週</button>
-      <button id="vMonth" aria-pressed="false">5週間</button>
+      <button id="vMonth" aria-pressed="false">全体</button>
     </div>
   </nav>
 
-  <p class="empty-note" id="emptyNote" hidden>先週から3週間後までの予定を表示します。まだ予定はありません。日付の「＋ 追加」から入れると、全員の画面にすぐ反映されます。</p>
+  <p class="empty-note" id="emptyNote" hidden>先週から2か月先までの予定を表示します。まだ予定はありません。日付の「＋ 追加」から入れると、全員の画面にすぐ反映されます。</p>
   <main id="view"></main>
 </div>
 
@@ -407,16 +407,18 @@ const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return
 const monday = d => addDays(d, -((d.getDay()+6)%7));
 const todayStr = () => ymd(new Date());
 
-// ---------- 表示できる期間：先週の月曜〜3週間後の日曜（5週間） ----------
-const WEEKS = 5;
-const REL = ["先週","今週","来週","再来週","3週間後"];
+// ---------- 表示できる期間：先週の月曜〜「今日の2か月後」を含む週の日曜 ----------
+const MONTHS_AHEAD = 2;
 const winStart = () => addDays(monday(new Date()), -7);
-const winEnd = () => addDays(winStart(), WEEKS*7-1);
+const winLastMon = () => { const t=new Date(); return monday(new Date(t.getFullYear(), t.getMonth()+MONTHS_AHEAD, t.getDate())); };
+const weeksCount = () => Math.round((winLastMon()-winStart())/(7*864e5))+1;
+const winEnd = () => addDays(winLastMon(), 6);
+const relLabel = wi => ["先週","今週","来週","再来週"][wi] || `${wi-1}週間後`;
 const weekIdOf = ds => ymd(monday(new Date(+ds.slice(0,4), +ds.slice(5,7)-1, +ds.slice(8))));
-const winWeekIds = () => Array.from({length:WEEKS}, (_,i)=>ymd(addDays(winStart(), i*7)));
+const winWeekIds = () => Array.from({length:weeksCount()}, (_,i)=>ymd(addDays(winStart(), i*7)));
 const inWindow = ds => ds>=ymd(winStart()) && ds<=ymd(winEnd());
 function clampAnchor(){
-  const lo=winStart(), hi=addDays(lo,(WEEKS-1)*7), m=monday(S.anchor);
+  const lo=winStart(), hi=winLastMon(), m=monday(S.anchor);
   if (m<lo) S.anchor=lo; else if (m>hi) S.anchor=hi;
 }
 
@@ -433,7 +435,7 @@ let F = null; // Firebase の関数とインスタンス
 
 // ---------- 保存先 ----------
 // Firestore では「weeks/{その週の月曜の日付}」の1ドキュメントに、1週間分の予定を
-// events: { 予定ID: {...} } としてまとめて保存する。表示中の5週間＝最大5ドキュメントを読むだけで済む。
+// events: { 予定ID: {...} } としてまとめて保存する。表示中の期間（約2か月＝10週前後）のドキュメントを読むだけで済む。
 const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 function demoSave(){ try{ localStorage.setItem("tozai.demo", JSON.stringify([...S.events])); }catch{} }
 function demoLoad(){ try{ S.events=new Map(JSON.parse(localStorage.getItem("tozai.demo")||"[]")); }catch{ S.events=new Map(); } }
@@ -513,7 +515,7 @@ function pruneLocal(){ // デモ用：期間より前の予定を消す
 let permTimer=null, permTries=0, permSince=Date.now();   // 権限エラーのとき、間隔をあけて読み込み直す（ルールを直した後に開き直さなくて済むように）
 function subscribe(){
   if (S.demo || !F) return;
-  const ids=winWeekIds(), key=ids[0];
+  const ids=winWeekIds(), key=ids[0]+"_"+ids[ids.length-1];
   if (key===S.winKey) return; S.winKey=key;
   if (S.unsub) S.unsub();
   const q=F.query(F.collection(F.db,"weeks"), F.where(F.documentId(),"in",ids));
@@ -564,9 +566,10 @@ async function cleanupOld(){
 }
 
 // 日付が変わって表示期間がずれたら読み直す
-let lastWin=ymd(winStart());
+const winSig = () => ymd(winStart())+"_"+ymd(winLastMon());
+let lastWin=winSig();
 function checkRollover(){
-  const w=ymd(winStart()); if (w===lastWin) return;
+  const w=winSig(); if (w===lastWin) return;
   lastWin=w; clampAnchor(); if (S.demo){ pruneLocal(); demoSave(); }
   subscribe(); cleanupOld(); render();
 }
@@ -625,7 +628,7 @@ function render(){
   $("vMonth").setAttribute("aria-pressed", S.view==="all");
   const wi=Math.round((monday(S.anchor)-winStart())/(7*864e5));
   $("prevBtn").disabled = S.view!=="week" || wi<=0;
-  $("nextBtn").disabled = S.view!=="week" || wi>=WEEKS-1;
+  $("nextBtn").disabled = S.view!=="week" || wi>=weeksCount()-1;
   const view=$("view"); view.replaceChildren(S.view==="week"?renderWeek():renderAll());
   $("emptyNote").hidden = S.events.size>0 || !S.canWrite;
   if (S.flashDate){ const r=view.querySelector(`[data-row="${S.flashDate}"]`); if (r){ r.classList.add("flash"); r.scrollIntoView({block:"nearest"}); } S.flashDate=null; }
@@ -635,7 +638,7 @@ function periodLabel(){
   if (S.view==="all") return `${md(winStart())}〜${md(winEnd())}`;
   const s=monday(S.anchor), e=addDays(s,6);
   const wi=Math.round((s-winStart())/(7*864e5));
-  return `${REL[wi]||""} ${md(s)}〜${s.getMonth()===e.getMonth()?e.getDate():md(e)}`;
+  return `${relLabel(wi)} ${md(s)}〜${s.getMonth()===e.getMonth()?e.getDate():md(e)}`;
 }
 function dayClass(d){ const s=ymd(d), w=d.getDay(); return [w===0?"sun":"", w===6?"sat":"", holidayName(s)?"hol":"", s===todayStr()?"today":"", s<todayStr()?"past":""].filter(Boolean).join(" "); }
 
@@ -694,7 +697,7 @@ function renderAll(){
   const box=h("div",{class:"month"});
   box.append(h("div",{class:"mgrid mhead"}, WD.map(w=>h("div",{text:w}))));
   const grid=h("div",{class:"mgrid"}); const s=winStart();
-  for (let i=0;i<WEEKS*7;i++){
+  for (let i=0;i<weeksCount()*7;i++){
     const d=addDays(s,i), ds=ymd(d);
     const cell=h("button",{type:"button",class:"cell "+dayClass(d),"aria-label":`${d.getMonth()+1}月${d.getDate()}日の週を開く`,
       onclick:()=>{ S.anchor=d; S.view="week"; S.flashDate=ds; saveView(); render(); }},
